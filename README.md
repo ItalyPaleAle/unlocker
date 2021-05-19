@@ -1,16 +1,36 @@
-## Requirements
+# Unlocker
 
-Make sure you have jq installed.
+## How to use
 
-## Define the list of URLs
+Before you can deploy and use Unlocker, you need to perform a few setup steps to create resources on Azure: a Key Vault and an Azure AD application that allows the admin to authenticate and allow or deny operations.
 
-Define the URL your application is listening on. For example:
+All the steps below must be run on your laptop before you deploy the app. At the end, you'll have the values required for the `config.yaml` file and for making requests to the service.
+
+You will need an Azure subscription to deploy these services. You can start a [free trial](https://azure.com/free) here. All the services we need for Unlocker are free (Azure AD) or very inexpensive (for this scenario, you should not spend more than a few cents on Azure Key Vault every month).
+
+### Requirements
+
+You'll need two tools installed in your development machine (these don't need to be installed on your server):
+
+- [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli)
+- [jq](https://stedolan.github.io/jq/download/)
+
+Alternatively, you can use [Azure Cloud Shell](https://shell.azure.com) in the browser to run the commands below, which already has all the dependencies available.
+
+### Define the URL
+
+First, define the URL your application is listening on and set it in a shell variable. For example:
 
 ```sh
-APP_URL="http://localhost:8080"
+# Using an ip:port notation
+APP_URL="http://10.20.30.40:8080"
+# Can be a hostname
+APP_URL="http://my-unlocker.local:8080"
 ```
 
-## Create a Resource Group on Azure
+This is the URL an admin will use to reach Unlocker. It doesn't need to be a public address, but it needs to be routable by an admin.
+
+### Create a Resource Group on Azure
 
 First, set the location where you want your resources to be created in:
 
@@ -18,7 +38,9 @@ First, set the location where you want your resources to be created in:
 LOCATION="WestUS2"
 ```
 
-Create a resource group:
+> You can get the full list of options with: `az account list-locations --output tsv`
+
+Create a Resource Group. Give it a friendly name in the `RG_NAME` variable: it will only be used for displaying in the Azure Portal.
 
 ```sh
 RG_NAME="Unlocker"
@@ -28,9 +50,9 @@ RG_ID=$(az group create \
   | jq -r .id)
 ```
 
-## Create the Azure Key Vault
+### Create the Azure Key Vault
 
-Create a Key Vault; the name of the Key Vault must be globally unique:
+Create a Key Vault. Set a name in the `KEYVAULT_NAME` variable, which must be globally unique:
 
 ```sh
 KEYVAULT_NAME="myunlockerkv"
@@ -51,7 +73,7 @@ az role assignment create \
   --scope "${RG_ID}/providers/Microsoft.KeyVault/vaults/${KEYVAULT_NAME}"
 ```
 
-Lastly, create a new key directly inside the vault. You may create multiple keys if needed, each with a different name:
+Lastly, create a new RSA-4096 key directly inside the vault. You may create multiple keys if needed, each with a different name set in the `KEYVAULT_KEY` variable:
 
 ```sh
 KEYVAULT_KEY="wrappingkey1"
@@ -64,11 +86,16 @@ az keyvault key create \
   --protection software
 ```
 
-## Azure AD application
+Take note of the value of `KEYVAULT_KEY`, which will be used when making requests to the unlocker service.
 
-Create an app in Azure AD that  to access Azure Key Vault with an user's delegated permissions.
+> Important: the command above generates a new RSA key within the Key Vault and returns the public part of the key. Because keys cannot be extracted from Azure Key Vault, you will never see the private key, and there's no way to obtain that (you can, however, create backups that only work inside Azure Key Vault). If you need access to the private key, consider importing a key inside the Key Vault rather than having it generate a new one for you.
+
+### Azure AD application
+
+Create an app in Azure AD to access Azure Key Vault with an user's delegated permissions.
 
 ```sh
+# Friendly name for the application
 APP_NAME="Unlocker"
 
 # Create the app
@@ -100,7 +127,7 @@ az ad app credential reset \
   --password $(openssl rand -base64 30)
 ```
 
-Take note of the output of the last command, which includes the values for the configuration file:
+Take note of the output of the last command, which includes the values for the `config.yaml` file:
 
 - `appId` is the value for `azure.clientId`
 - `password` is the value for `azure.clientSecret`
