@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <title>Unlocker</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+
+<body>
+    <p>
+        Request to {{.Operation}} key.
+    </p>
+    <div id="prompt">
+        <button data-operation="confirm">Confirm</button>
+        <button data-operation="cancel">Cancel</button>
+    </div>
+    <div id="working">
+        Working on it…
+    </div>
+    <div id="confirmed">
+        Confirmed!
+    </div>
+    <div id="canceled">
+        Canceled!
+    </div>
+    <div id="error"></div>
+<script>
+;(() => {
+    // Remove the parameters from the querystring (which include the authorization code)
+    history.replaceState(null, null, '/confirm')
+
+    // Hide the working/confirmed/canceled/error blocks
+    document.querySelectorAll('#working,#confirmed,#canceled,#error').forEach((el) => el.style.display = 'none')
+
+    // Handle clicks on buttons
+    document.querySelectorAll('[data-operation]')
+        .forEach((el) => el.addEventListener('click', async (event) => {
+            document.getElementById('error').style.display = 'none'
+            document.getElementById('prompt').style.display = 'none'
+            document.getElementById('working').style.display = 'block'
+            event.preventDefault()
+            try {
+                const operation = event.target.getAttribute('data-operation')
+                const body = {
+                    state: '{{.State}}'
+                }
+                if (operation == 'confirm') {
+                    body.confirm = true
+                } else if (operation == 'cancel') {
+                    body.cancel = true
+                } else {
+                    throw Error('Invalid operation')
+                }
+                const res = await fetch('/confirm', {
+                    method: 'POST',
+                    body: JSON.stringify(body),
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                if (!res.ok) {
+                    throw Error('Invalid response status: ' + res.status)
+                }
+                document.getElementById('prompt').style.display = 'none'
+                if (operation == 'confirm') {
+                    document.getElementById('confirmed').style.display = 'block'
+                } else {
+                    document.getElementById('canceled').style.display = 'block'
+                }
+            } catch (err) {
+                document.getElementById('prompt').style.display = 'block'
+                const el = document.getElementById('error')
+                el.style.display = 'block'
+                el.innerText = 'Error: ' + err
+            }
+            document.getElementById('working').style.display = 'none'
+        }))
+})()
+</script>
+</body>
+
+</html>
