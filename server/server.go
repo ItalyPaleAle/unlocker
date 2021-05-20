@@ -95,13 +95,19 @@ func (s *Server) Init(log *utils.AppLogger) error {
 	}
 	s.router.SetHTMLTemplate(confirmPageTpl)
 
+	// Middleware to allow certain IPs
+	allowIpMw, err := s.AllowIpMiddleware()
+	if err != nil {
+		return err
+	}
+
 	// Add routes
-	s.router.POST("/wrap", s.RouteWrapUnwrap(OperationWrap))
-	s.router.POST("/unwrap", s.RouteWrapUnwrap(OperationUnwrap))
+	s.router.POST("/wrap", allowIpMw, s.RouteWrapUnwrap(OperationWrap))
+	s.router.POST("/unwrap", allowIpMw, s.RouteWrapUnwrap(OperationUnwrap))
+	s.router.GET("/result/:state", allowIpMw, s.RouteResult)
 	s.router.GET("/auth", s.RouteAuth)
 	s.router.GET("/confirm", s.log.LoggerMaskMiddleware(codeFilterExp, "$1$2***"), s.RouteConfirmGet)
 	s.router.POST("/confirm", s.RouteConfirmPost)
-	s.router.GET("/result/:state", s.RouteResult)
 
 	// Start the background worker that cleans up all states
 	s.statesCleanup()

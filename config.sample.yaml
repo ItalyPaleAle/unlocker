@@ -21,6 +21,11 @@ port: 8080
 # Default: "0.0.0.0" to listen on every interface
 bind: "0.0.0.0"
 
+# Comma-separated list of IPs (and IP ranges in CIDR notation) that are allowed to invoke the /wrap, /unwrap and /result methods
+# If empty, all requests are allowed
+# This doesn't apply to the endpoints used by admins to confirm requests
+allowedIps: ""
+
 # Comma-separated lists of origins for CORS
 # If empty or unset, will allow any origin (default)
 #origins: "http://url1,http://url2"
