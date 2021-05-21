@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
@@ -70,9 +71,17 @@ func (s *Server) RouteConfirmGet(c *gin.Context) {
 	c.HTML(http.StatusOK, "confirm-page", struct {
 		State     string
 		Operation string
+		KeyId     string
+		VaultName string
+		Requestor string
+		Date      string
 	}{
 		State:     stateId,
 		Operation: operationName,
+		KeyId:     state.KeyId,
+		VaultName: state.Vault,
+		Requestor: state.Requestor,
+		Date:      state.Date.Format(time.RFC1123),
 	})
 }
 
