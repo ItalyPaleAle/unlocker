@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"os"
+	"path/filepath"
 
 	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
@@ -39,14 +40,20 @@ func main() {
 	}
 
 	// Start the server in background and block until the server is shut down
-	srv.Start(context.Background())
+	err = srv.Start(context.Background())
+	if err != nil {
+		appLogger.Raw().Fatal().
+			AnErr("error", err).
+			Msg("Cannot start the server")
+		return
+	}
 }
 
 func loadConfig() {
 	// Defaults
 	viper.SetDefault("port", 8080)
 	viper.SetDefault("bind", "0.0.0.0")
-	viper.SetDefault("baseUrl", "http://localhost:8080")
+	viper.SetDefault("baseUrl", "https://localhost:8080")
 
 	// Env
 	viper.SetEnvPrefix("UNLOCKER")
@@ -87,5 +94,14 @@ func loadConfig() {
 		appLogger.Raw().Fatal().
 			AnErr("error", errors.New("Config entry key 'webhookUrl' missing")).
 			Msg("Invalid configuration")
+	}
+
+	// TLS certificate
+	// Fallback to tls-cert.pem and tls-key.pem if not set
+	if viper.GetString("tlsCert") == "" || viper.GetString("tlsKey") == "" {
+		file := viper.ConfigFileUsed()
+		dir := filepath.Dir(file)
+		viper.Set("tlsCert", filepath.Join(dir, "tls-cert.pem"))
+		viper.Set("tlsKey", filepath.Join(dir, "tls-key.pem"))
 	}
 }

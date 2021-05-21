@@ -1,15 +1,26 @@
-package server
+package utils
 
 import (
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/spf13/viper"
 )
 
-// Sends a webhook notification
-func (s *Server) sendWebhook(message string) error {
+type Webhook struct {
+	httpClient *http.Client
+}
+
+func (w *Webhook) Init() {
+	// Init a HTTP client
+	w.httpClient = &http.Client{
+		Timeout: 10 * time.Second,
+	}
+}
+
+func (w *Webhook) SendWebhook(message string) error {
 	// Trigger the webhook
 	req, err := http.NewRequest("POST", viper.GetString("webhookUrl"), strings.NewReader(message))
 	if err != nil {
@@ -20,7 +31,7 @@ func (s *Server) sendWebhook(message string) error {
 	if webhookKey != "" {
 		req.Header.Set("Authorization", webhookKey)
 	}
-	res, err := s.httpClient.Do(req)
+	res, err := w.httpClient.Do(req)
 	if err != nil {
 		return err
 	}

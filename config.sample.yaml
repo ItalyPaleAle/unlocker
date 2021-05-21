@@ -13,6 +13,11 @@ webhookUrl: ""
 # If present, will be passed as value for the "Authorization" header in requests to the webhook
 webhookKey: ""
 
+# Path to TLS certificate and key
+# If empty, it will load a certificate from "tls-cert.pem" and a key from "tls-key.pem" in the same folder as the config file
+tlsCert: ""
+tlsKey: ""
+
 # Port to listen to
 # Default: 8080
 port: 8080
@@ -27,10 +32,11 @@ bind: "0.0.0.0"
 allowedIps: ""
 
 # Comma-separated lists of origins for CORS
-# If empty or unset, will allow any origin (default)
-#origins: "http://url1,http://url2"
+# If empty or unset, will the same as baseUrl
+# To allow any origin, set value to "*"
+#origins: "https://url1,https://url2"
 
 # Base URL where the application is deployed, used for authentication callbacks and in notifications
 # This URL must be routable by clients (administrators), but doesn't need to be public
-# Default: "http://localhost:8080"
-baseUrl: "http://localhost:8080"
+# Default: "https://localhost:8080"
+baseUrl: "https://localhost:8080"

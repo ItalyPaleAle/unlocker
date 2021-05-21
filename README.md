@@ -16,17 +16,17 @@ Unlocker doesn't have standing permission to perform operations on the vault, so
 
 In these section we'll be looking at how to wrap and unwrap a key, which in our example is `helloworld`; Unlocker supports any kind of keys and keyfiles, for both symmetric and asymmetric ciphers.
 
-We will use a key called `wrappingkey1` stored inside an Azure Key Vault called `myunlockerkv`. We also assume that Unlocker is available at the address `http://10.20.30.40:8080`.
+We will use a key called `wrappingkey1` stored inside an Azure Key Vault called `myunlockerkv`. We also assume that Unlocker is available at the address `https://10.20.30.40:8080`.
 
 > Read the [**Set up**](#set-up) section below for how to set up your Unlocker app, the relevant resources on Azure, and how to generate a key inside Key Vault.
 
 ### Configure and start Unlocker
 
-Unlocker runs as a (lightweight) app on a server you control and that offers a HTTP endpoint. You can install it on the same server where your application that requires the cryptographic key runs, or on a separate machine.
+Unlocker runs as a (lightweight) app on a server you control and that offers a HTTPS endpoint. You can install it on the same server where your application that requires the cryptographic key runs, or on a separate machine.
 
-> **Firewall rules:** Unlocker must be deployed on a server that admins can connect to via HTTP(S), on a port of your choice. While Unlocker doesn't need to be exposed on the public Internet, your admins must be able to connect to it, even if through a private IP or VPN. Additionally, Unlocker must be able to make outgoing HTTPS requests.
+> **Firewall rules:** Unlocker must be deployed on a server that admins can connect to via HTTPS, on a port of your choice. While Unlocker doesn't need to be exposed on the public Internet, your admins must be able to connect to it, even if through a private IP or VPN. Additionally, Unlocker must be able to make outgoing HTTPS requests.
 
-TODO: CONFIGURE AND START WITH DOCKER
+TODO: CONFIGURE, TLS CERT, AND START WITH DOCKER
 
 ### Wrapping a key
 
@@ -42,10 +42,13 @@ To wrap (encrypt) a key, first make a POST request to the **`/wrap`** endpoint. 
 For example, with curl and the sample data above (note that `aGVsbG93b3JsZA==` is the base64-encoded representation of `helloworld`, the key we want to encrypt; we are also setting an optional timeout of 10 minutes, or 600 seconds):
 
 ```sh
-curl http://10.20.30.40:8080/wrap \
+curl https://10.20.30.40:8080/wrap \
+  --insecure \
   -H "Content-Type: application/json" \
   --data '{"vault":"myunlockerkv","keyId":"wrappingkey1","value":"aGVsbG93b3JsZA==","timeout":600}'
 ```
+
+> Note: in all the examples we're using the `--insecure` flag to tell curl to accept self-signed TLS certificates. If you are using a TLS certificate signed by a Certification Authority, you can (and should) omit that flag.
 
 The response will be a JSON object similar to this, where `state` is the ID of the request.
 
@@ -62,14 +65,15 @@ Your application can obtain the key by making a GET request to the `/result/:sta
 
 ```sh
 STATE_ID="4336d140-2ba1-4d7a-af84-a83d564e384b"
-curl http://10.20.30.40:8080/result/${STATE_ID}
+curl --insecure https://10.20.30.40:8080/result/${STATE_ID}
 ```
 
 > You can automatically set the value of the `STATE_ID` variable from the `/wrap` request using jq:
 >
 > ```sh
 > STATE_ID=$(\
->   curl http://10.20.30.40:8080/wrap \
+>   curl https://10.20.30.40:8080/wrap \
+>     --insecure \
 >     -H "Content-Type: application/json" \
 >     --data '{"vault":"myunlockerkv","keyId":"wrappingkey1","value":"aGVsbG93b3JsZA==","timeout":600}' \
 >   | jq -r .state
@@ -108,7 +112,8 @@ To unwrap a key, first make a POST request to the **`/unwrap`** endpoint. The PO
 For example, to unwrap the key wrapped above with curl, we can make this request (note that the `value` field contains the key that was wrapped earlier, partially omitted here for legibility):
 
 ```sh
-curl http://10.20.30.40:8080/unwrap \
+curl https://10.20.30.40:8080/unwrap \
+  --insecure \
   -H "Content-Type: application/json" \
   --data '{"vault":"myunlockerkv","keyId":"wrappingkey1","value":"pftzpou...MlxVIk="}'
 ```
@@ -128,7 +133,8 @@ The rest of the process is identical to the one you followed to wrap a key.
 >
 > ```sh
 > STATE_ID=$(\
->   curl http://10.20.30.40:8080/unwrap \
+>   curl https://10.20.30.40:8080/unwrap \
+>     --insecure \
 >     -H "Content-Type: application/json" \
 >     --data '{"vault":"myunlockerkv","keyId":"wrappingkey1","value":"pftzpou...MlxVIk="}' \
 >   | jq -r .state
@@ -140,7 +146,7 @@ The administrator will receive another notification through the webhook configur
 Just as when wrapping a key, your application can invoke the `/result/:state` method to check the status of the request. This will block until the operation is complete, and the result will contain the unwrapped key (base64-encoded):
 
 ```sh
-curl http://10.20.30.40:8080/result/${STATE_ID}
+curl --insecure https://10.20.30.40:8080/result/${STATE_ID}
 ```
 
 A **successful**, final response will contain a JSON body similar to:
@@ -160,7 +166,7 @@ Just as before, note that requests to `/result/:state` may time out because of y
 Using curl and jq, you can retrieve the raw (decoded) key to pipe it directly to an application that needs to consume it with:
 
 ```sh
-curl http://10.20.30.40:8080/result/${STATE_ID} \
+curl --insecure https://10.20.30.40:8080/result/${STATE_ID} \
   | jq -r .value \
   | base64 --decode
 ```
@@ -190,9 +196,9 @@ First, define the URL your application is listening on and set it in a shell var
 
 ```sh
 # Using an ip:port notation
-APP_URL="http://10.20.30.40:8080"
+APP_URL="https://10.20.30.40:8080"
 # Can be a hostname
-APP_URL="http://my-unlocker.local:8080"
+APP_URL="https://my-unlocker.local:8080"
 ```
 
 This is the URL an admin will use to reach Unlocker. It doesn't need to be a public address, but it needs to be routable by an admin.

@@ -2,9 +2,9 @@ package server
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"html/template"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
@@ -34,6 +34,7 @@ type Server struct {
 	log        *utils.AppLogger
 	states     map[string]*requestState
 	lock       *sync.Mutex
+	webhook    *utils.Webhook
 }
 
 // Init the Server object and create a Gin server
@@ -44,6 +45,10 @@ func (s *Server) Init(log *utils.AppLogger) error {
 
 	// Set Gin to Release mode
 	gin.SetMode(gin.ReleaseMode)
+
+	// Init the webhook
+	s.webhook = &utils.Webhook{}
+	s.webhook.Init()
 
 	// Init a HTTP client
 	s.httpClient = &http.Client{
@@ -77,11 +82,15 @@ func (s *Server) Init(log *utils.AppLogger) error {
 
 	// Check if we are restricting the origins for CORS
 	originsStr := viper.GetString("origins")
-	if originsStr != "" {
+	if originsStr == "" {
+		// Default is baseUrl
+		originsStr = viper.GetString("baseUrl")
+	}
+	if originsStr == "*" {
+		corsConfig.AllowAllOrigins = true
+	} else {
 		corsConfig.AllowAllOrigins = false
 		corsConfig.AllowOrigins = strings.Split(originsStr, ",")
-	} else {
-		corsConfig.AllowAllOrigins = true
 	}
 	s.router.Use(cors.New(corsConfig))
 
@@ -117,7 +126,7 @@ func (s *Server) Init(log *utils.AppLogger) error {
 
 // Start the web server
 // Note this function is blocking, and will return only when the servers are shut down (via context cancelation or via SIGINT/SIGTERM signals)
-func (s *Server) Start(ctx context.Context) {
+func (s *Server) Start(ctx context.Context) error {
 	s.ctx = ctx
 
 	// Get address and port to bind to (fallback to default)
@@ -131,25 +140,37 @@ func (s *Server) Start(ctx context.Context) {
 	}
 
 	// Launch the server (this is a blocking call)
-	s.launchServer(bindAddr, bindPort)
+	return s.launchServer(bindAddr, bindPort)
 }
 
 // Start the server
-func (s *Server) launchServer(bindAddr string, bindPort int) {
-	// HTTP server (no TLS)
+func (s *Server) launchServer(bindAddr string, bindPort int) error {
+	// HTTPS server
+	tlsCert, err := s.loadTLSCert()
+	if err != nil {
+		return err
+	}
 	httpSrv := &http.Server{
 		Addr:           fmt.Sprintf("%s:%d", bindAddr, bindPort),
 		Handler:        s.router,
 		MaxHeaderBytes: 1 << 20,
 		ReadTimeout:    10 * time.Second,
 		WriteTimeout:   10 * time.Second,
+		TLSConfig: &tls.Config{
+			MinVersion:   tls.VersionTLS12,
+			Certificates: tlsCert,
+		},
 	}
 
-	// Start the HTTP server in a background goroutine
+	// Start the HTTPS server in a background goroutine
 	go func() {
-		fmt.Printf("HTTP server listening on http://%s:%d\n", bindAddr, bindPort)
+		s.log.Raw().Info().
+			Str("bind", bindAddr).
+			Int("port", bindPort).
+			Str("url", viper.GetString("baseUrl")).
+			Msg("HTTPS server started")
 		// Next call blocks until the server is shut down
-		err := httpSrv.ListenAndServe()
+		err := httpSrv.ListenAndServeTLS("", "")
 		if err != http.ErrServerClosed {
 			panic(err)
 		}
@@ -167,12 +188,16 @@ func (s *Server) launchServer(bindAddr string, bindPort int) {
 
 	// We received an interrupt signal, shut down the server
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	err := httpSrv.Shutdown(shutdownCtx)
+	err = httpSrv.Shutdown(shutdownCtx)
 	shutdownCancel()
 	// Log the errors (could be context canceled)
 	if err != nil {
-		log.Println("HTTP server shutdown error:", err)
+		s.log.Raw().Warn().
+			AnErr("error", err).
+			Msg("HTTP server shutdown error")
 	}
+
+	return nil
 }
 
 // Starts a goroutine that periodically removes expired states
@@ -192,6 +217,25 @@ func (s *Server) statesCleanup() {
 			s.lock.Unlock()
 		}
 	}()
+}
+
+// Loads the TLS certificate specified in the config file
+func (s *Server) loadTLSCert() ([]tls.Certificate, error) {
+	tlsCert := viper.GetString("tlsCert")
+	tlsKey := viper.GetString("tlsKey")
+
+	// Check if the values from the config file are PEM-encoded certificates directly
+	obj, err := tls.X509KeyPair([]byte(tlsCert), []byte(tlsKey))
+	if err == nil {
+		return []tls.Certificate{obj}, nil
+	}
+
+	// Try loading from file
+	obj, err = tls.LoadX509KeyPair(tlsCert, tlsKey)
+	if err != nil {
+		return nil, err
+	}
+	return []tls.Certificate{obj}, nil
 }
 
 const (

@@ -81,7 +81,7 @@ func (s *Server) RouteWrapUnwrap(op int) gin.HandlerFunc {
 		if op == OperationUnwrap {
 			opName = "unwrap"
 		}
-		err = s.sendWebhook(fmt.Sprintf("Received a request to %s a key using key **%s** in vault **%s**.\n\n[Confirm request](%s)\n\n(Request ID: %s - Client IP: %s)", opName, req.KeyId, req.Vault, link, stateId, ip))
+		err = s.webhook.SendWebhook(fmt.Sprintf("Received a request to %s a key using key **%s** in vault **%s**.\n\n[Confirm request](%s)\n\n(Request ID: %s - Client IP: %s)", opName, req.KeyId, req.Vault, link, stateId, ip))
 		if err != nil {
 			c.Error(err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, map[string]string{"error": "Error sending webhook"})
