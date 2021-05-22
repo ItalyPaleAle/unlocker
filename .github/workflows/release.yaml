@@ -162,28 +162,6 @@ jobs:
                 cp README.md .bin/unlocker-v${{env.BUILD_VERSION}}-macos-arm64
                 (cd .bin && tar -czvf ../.out/unlocker-v${{env.BUILD_VERSION}}-macos-arm64.tar.gz unlocker-v${{env.BUILD_VERSION}}-macos-arm64)
 
-                echo -e "\n###\nBuilding windows/amd64\n"
-                mkdir .bin/unlocker-v${{env.BUILD_VERSION}}-win64
-                GOOS=windows \
-                GOARCH=amd64 \
-                  go build \
-                    -ldflags "-X github.com/italypaleale/unlocker/buildinfo.Production=1 -X github.com/italypaleale/unlocker/buildinfo.AppVersion=${{env.BUILD_VERSION}} -X github.com/italypaleale/unlocker/buildinfo.BuildId=${{env.BUILD_ID}} -X github.com/italypaleale/unlocker/buildinfo.BuildDate=${{env.BUILD_DATE}} -X github.com/italypaleale/unlocker/buildinfo.CommitHash=${{env.COMMIT_HASH}}" \
-                    -o .bin/unlocker-v${{env.BUILD_VERSION}}-win64/unlocker.exe
-                cp LICENSE.md .bin/unlocker-v${{env.BUILD_VERSION}}-win64
-                cp README.md .bin/unlocker-v${{env.BUILD_VERSION}}-win64
-                (cd .bin && zip -r ../.out/unlocker-v${{env.BUILD_VERSION}}-win64.zip unlocker-v${{env.BUILD_VERSION}}-win64)
-
-                echo -e "\n###\nBuilding windows/386\n"
-                mkdir .bin/unlocker-v${{env.BUILD_VERSION}}-win32
-                GOOS=windows \
-                GOARCH=386 \
-                  go build \
-                    -ldflags "-X github.com/italypaleale/unlocker/buildinfo.Production=1 -X github.com/italypaleale/unlocker/buildinfo.AppVersion=${{env.BUILD_VERSION}} -X github.com/italypaleale/unlocker/buildinfo.BuildId=${{env.BUILD_ID}} -X github.com/italypaleale/unlocker/buildinfo.BuildDate=${{env.BUILD_DATE}} -X github.com/italypaleale/unlocker/buildinfo.CommitHash=${{env.COMMIT_HASH}}" \
-                    -o .bin/unlocker-v${{env.BUILD_VERSION}}-win32/unlocker.exe
-                cp LICENSE.md .bin/unlocker-v${{env.BUILD_VERSION}}-win32
-                cp README.md .bin/unlocker-v${{env.BUILD_VERSION}}-win32
-                (cd .bin && zip -r ../.out/unlocker-v${{env.BUILD_VERSION}}-win32.zip unlocker-v${{env.BUILD_VERSION}}-win32)
-
                 echo -e "\n###\nLinks for Docker buildx\n"
                 cd .bin
                 ln -v -s unlocker-v${{env.BUILD_VERSION}}-linux-amd64 linux-amd64 
@@ -273,26 +251,6 @@ jobs:
           asset_path: .out/unlocker-v${{env.BUILD_VERSION}}-macos-arm64.tar.gz
           asset_name: unlocker-v${{env.BUILD_VERSION}}-macos-arm64.tar.gz
           asset_content_type: application/gzip
-
-      - name: Upload release asset unlocker-win64
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: .out/unlocker-v${{env.BUILD_VERSION}}-win64.zip
-          asset_name: unlocker-v${{env.BUILD_VERSION}}-win64.zip
-          asset_content_type: application/zip
-
-      - name: Upload release asset unlocker-win32
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: .out/unlocker-v${{env.BUILD_VERSION}}-win32.zip
-          asset_name: unlocker-v${{env.BUILD_VERSION}}-win32.zip
-          asset_content_type: application/zip
 
       - name: Docker build and push
         id: docker_build
