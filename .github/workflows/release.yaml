@@ -188,7 +188,7 @@ jobs:
                 cd .bin
                 ln -v -s unlocker-v${{env.BUILD_VERSION}}-linux-amd64 linux-amd64 
                 ln -v -s unlocker-v${{env.BUILD_VERSION}}-linux-arm64 linux-arm64 
-                ln -v -s unlocker-v${{env.BUILD_VERSION}}-linux-armv7 linux-arm-v7
+                ln -v -s unlocker-v${{env.BUILD_VERSION}}-linux-armv7 linux-arm
                 cd ..
                 '
           echo -e "\n###\nCompilation done\n"
