@@ -1,0 +1,310 @@
+# Creates a release for the application
+name: Release
+
+on:
+  push:
+    tags:
+      # Push to tags matching v*
+      - 'v*'
+
+env:
+  GO_BUILDER_IMAGE: 'golang:1.16-alpine'
+  
+jobs:
+
+  build:
+    name: Build
+    runs-on: ubuntu-20.04
+    steps:
+
+      - name: Check out code
+        uses: actions/checkout@v2
+
+      - name: Set variables
+        run: |
+          mkdir -p .bin
+          # Fetch semver: https://github.com/fsaintjacques/semver-tool
+          curl https://raw.githubusercontent.com/fsaintjacques/semver-tool/3.0.0/src/semver > .bin/semver
+          chmod +x .bin/semver
+
+          # Trim the first 10 characters, which are "refs/tags/"
+          BUILD_ID="${GITHUB_REF:10}"
+          # Just like BUILD_ID, but without the "v" at the beginning
+          BUILD_VERSION="${GITHUB_REF:11}"
+          BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%S')
+          COMMIT_HASH=$(echo $GITHUB_SHA | head -c 7)
+          echo "BUILD_ID=$BUILD_ID" >> $GITHUB_ENV
+          echo "BUILD_VERSION=$BUILD_VERSION" >> $GITHUB_ENV
+          echo "BUILD_DATE=$BUILD_DATE" >> $GITHUB_ENV
+          echo "COMMIT_HASH=$COMMIT_HASH" >> $GITHUB_ENV
+
+          # Branch
+          MAJOR_VERSION=$(.bin/semver get major $BUILD_VERSION)
+          MINOR_VERSION=$(.bin/semver get minor $BUILD_VERSION)
+          PRERELEASE=$(.bin/semver get prerel $BUILD_VERSION)
+          BRANCH=""
+          if [ "$MAJOR_VERSION" = "0" ]; then
+            BRANCH="$MAJOR_VERSION.$MINOR_VERSION"
+          else
+            BRANCH="$MAJOR_VERSION"
+          fi
+          if [ "$PRERELEASE" != "" ]; then
+            BRANCH="${BRANCH}-pre"
+          fi
+          echo "BRANCH=$BRANCH" >> $GITHUB_ENV
+          echo "PRERELEASE=$PRERELEASE" >> $GITHUB_ENV
+
+      - name: Login to DockerHub
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v1 
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.CR_PAT }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v1
+
+      - name: Build for all platforms
+        run: |
+          mkdir -p .bin
+          # Build using Docker
+          # Disable CGO so the binary is fully static
+          docker run \
+            --rm \
+            -v "$PWD":/usr/src/myapp \
+            -w /usr/src/myapp \
+            -e CGO_ENABLED=0 \
+            -e GO111MODULE=on \
+            ${{env.GO_BUILDER_IMAGE}} \
+              sh -c '
+                set -e
+                mkdir -p .out
+
+                echo -e "###\nInstall zip, git\n"
+                apk add zip git
+
+                echo -e "\n###\nFetching modules\n"
+                go get -v
+
+                echo -e "\n###\nBuilding linux/amd64\n"
+                mkdir .bin/unlocker-v${{env.BUILD_VERSION}}-linux-amd64
+                GOOS=linux \
+                GOARCH=amd64 \
+                  go build \
+                    -ldflags "-X github.com/italypaleale/unlocker/buildinfo.Production=1 -X github.com/italypaleale/unlocker/buildinfo.AppVersion=${{env.BUILD_VERSION}} -X github.com/italypaleale/unlocker/buildinfo.BuildId=${{env.BUILD_ID}} -X github.com/italypaleale/unlocker/buildinfo.BuildDate=${{env.BUILD_DATE}} -X github.com/italypaleale/unlocker/buildinfo.CommitHash=${{env.COMMIT_HASH}}" \
+                    -o .bin/unlocker-v${{env.BUILD_VERSION}}-linux-amd64/unlocker
+                cp LICENSE.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-amd64
+                cp README.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-amd64
+                (cd .bin && tar -czvf ../.out/unlocker-v${{env.BUILD_VERSION}}-linux-amd64.tar.gz unlocker-v${{env.BUILD_VERSION}}-linux-amd64)
+
+                echo -e "\n###\nBuilding linux/386\n"
+                mkdir .bin/unlocker-v${{env.BUILD_VERSION}}-linux-386
+                GOOS=linux \
+                GOARCH=386 \
+                  go build \
+                    -ldflags "-X github.com/italypaleale/unlocker/buildinfo.Production=1 -X github.com/italypaleale/unlocker/buildinfo.AppVersion=${{env.BUILD_VERSION}} -X github.com/italypaleale/unlocker/buildinfo.BuildId=${{env.BUILD_ID}} -X github.com/italypaleale/unlocker/buildinfo.BuildDate=${{env.BUILD_DATE}} -X github.com/italypaleale/unlocker/buildinfo.CommitHash=${{env.COMMIT_HASH}}" \
+                    -o .bin/unlocker-v${{env.BUILD_VERSION}}-linux-386/unlocker
+                cp LICENSE.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-386
+                cp README.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-386
+                (cd .bin && tar -czvf ../.out/unlocker-v${{env.BUILD_VERSION}}-linux-386.tar.gz unlocker-v${{env.BUILD_VERSION}}-linux-386)
+
+                echo -e "\n###\nBuilding linux/arm64\n"
+                mkdir .bin/unlocker-v${{env.BUILD_VERSION}}-linux-arm64
+                GOOS=linux \
+                GOARCH=arm64 \
+                  go build \
+                    -ldflags "-X github.com/italypaleale/unlocker/buildinfo.Production=1 -X github.com/italypaleale/unlocker/buildinfo.AppVersion=${{env.BUILD_VERSION}} -X github.com/italypaleale/unlocker/buildinfo.BuildId=${{env.BUILD_ID}} -X github.com/italypaleale/unlocker/buildinfo.BuildDate=${{env.BUILD_DATE}} -X github.com/italypaleale/unlocker/buildinfo.CommitHash=${{env.COMMIT_HASH}}" \
+                    -o .bin/unlocker-v${{env.BUILD_VERSION}}-linux-arm64/unlocker
+                cp LICENSE.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-arm64
+                cp README.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-arm64
+                (cd .bin && tar -czvf ../.out/unlocker-v${{env.BUILD_VERSION}}-linux-arm64.tar.gz unlocker-v${{env.BUILD_VERSION}}-linux-arm64)
+
+                echo -e "\n###\nBuilding linux/armv7\n"
+                mkdir .bin/unlocker-v${{env.BUILD_VERSION}}-linux-armv7
+                GOOS=linux \
+                GOARCH=arm \
+                GOARM=7 \
+                  go build \
+                    -ldflags "-X github.com/italypaleale/unlocker/buildinfo.Production=1 -X github.com/italypaleale/unlocker/buildinfo.AppVersion=${{env.BUILD_VERSION}} -X github.com/italypaleale/unlocker/buildinfo.BuildId=${{env.BUILD_ID}} -X github.com/italypaleale/unlocker/buildinfo.BuildDate=${{env.BUILD_DATE}} -X github.com/italypaleale/unlocker/buildinfo.CommitHash=${{env.COMMIT_HASH}}" \
+                    -o .bin/unlocker-v${{env.BUILD_VERSION}}-linux-armv7/unlocker
+                cp LICENSE.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-armv7
+                cp README.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-armv7
+                (cd .bin && tar -czvf ../.out/unlocker-v${{env.BUILD_VERSION}}-linux-armv7.tar.gz unlocker-v${{env.BUILD_VERSION}}-linux-armv7)
+
+                echo -e "\n###\nBuilding darwin/amd64\n"
+                mkdir .bin/unlocker-v${{env.BUILD_VERSION}}-macos
+                GOOS=darwin \
+                GOARCH=amd64 \
+                  go build \
+                    -ldflags "-X github.com/italypaleale/unlocker/buildinfo.Production=1 -X github.com/italypaleale/unlocker/buildinfo.AppVersion=${{env.BUILD_VERSION}} -X github.com/italypaleale/unlocker/buildinfo.BuildId=${{env.BUILD_ID}} -X github.com/italypaleale/unlocker/buildinfo.BuildDate=${{env.BUILD_DATE}} -X github.com/italypaleale/unlocker/buildinfo.CommitHash=${{env.COMMIT_HASH}}" \
+                    -o .bin/unlocker-v${{env.BUILD_VERSION}}-macos-x64/unlocker
+                cp LICENSE.md .bin/unlocker-v${{env.BUILD_VERSION}}-macos-x64
+                cp README.md .bin/unlocker-v${{env.BUILD_VERSION}}-macos-x64
+                (cd .bin && tar -czvf ../.out/unlocker-v${{env.BUILD_VERSION}}-macos-x64.tar.gz unlocker-v${{env.BUILD_VERSION}}-macos-x64)
+
+                echo -e "\n###\nBuilding darwin/arm64\n"
+                mkdir .bin/unlocker-v${{env.BUILD_VERSION}}-macos-arm64
+                GOOS=darwin \
+                GOARCH=arm64 \
+                  go build \
+                    -ldflags "-X github.com/italypaleale/unlocker/buildinfo.Production=1 -X github.com/italypaleale/unlocker/buildinfo.AppVersion=${{env.BUILD_VERSION}} -X github.com/italypaleale/unlocker/buildinfo.BuildId=${{env.BUILD_ID}} -X github.com/italypaleale/unlocker/buildinfo.BuildDate=${{env.BUILD_DATE}} -X github.com/italypaleale/unlocker/buildinfo.CommitHash=${{env.COMMIT_HASH}}" \
+                    -o .bin/unlocker-v${{env.BUILD_VERSION}}-macos-arm64/unlocker
+                cp LICENSE.md .bin/unlocker-v${{env.BUILD_VERSION}}-macos-arm64
+                cp README.md .bin/unlocker-v${{env.BUILD_VERSION}}-macos-arm64
+                (cd .bin && tar -czvf ../.out/unlocker-v${{env.BUILD_VERSION}}-macos-arm64.tar.gz unlocker-v${{env.BUILD_VERSION}}-macos-arm64)
+
+                echo -e "\n###\nBuilding windows/amd64\n"
+                mkdir .bin/unlocker-v${{env.BUILD_VERSION}}-win64
+                GOOS=windows \
+                GOARCH=amd64 \
+                  go build \
+                    -ldflags "-X github.com/italypaleale/unlocker/buildinfo.Production=1 -X github.com/italypaleale/unlocker/buildinfo.AppVersion=${{env.BUILD_VERSION}} -X github.com/italypaleale/unlocker/buildinfo.BuildId=${{env.BUILD_ID}} -X github.com/italypaleale/unlocker/buildinfo.BuildDate=${{env.BUILD_DATE}} -X github.com/italypaleale/unlocker/buildinfo.CommitHash=${{env.COMMIT_HASH}}" \
+                    -o .bin/unlocker-v${{env.BUILD_VERSION}}-win64/unlocker.exe
+                cp LICENSE.md .bin/unlocker-v${{env.BUILD_VERSION}}-win64
+                cp README.md .bin/unlocker-v${{env.BUILD_VERSION}}-win64
+                (cd .bin && zip -r ../.out/unlocker-v${{env.BUILD_VERSION}}-win64.zip unlocker-v${{env.BUILD_VERSION}}-win64)
+
+                echo -e "\n###\nBuilding windows/386\n"
+                mkdir .bin/unlocker-v${{env.BUILD_VERSION}}-win32
+                GOOS=windows \
+                GOARCH=386 \
+                  go build \
+                    -ldflags "-X github.com/italypaleale/unlocker/buildinfo.Production=1 -X github.com/italypaleale/unlocker/buildinfo.AppVersion=${{env.BUILD_VERSION}} -X github.com/italypaleale/unlocker/buildinfo.BuildId=${{env.BUILD_ID}} -X github.com/italypaleale/unlocker/buildinfo.BuildDate=${{env.BUILD_DATE}} -X github.com/italypaleale/unlocker/buildinfo.CommitHash=${{env.COMMIT_HASH}}" \
+                    -o .bin/unlocker-v${{env.BUILD_VERSION}}-win32/unlocker.exe
+                cp LICENSE.md .bin/unlocker-v${{env.BUILD_VERSION}}-win32
+                cp README.md .bin/unlocker-v${{env.BUILD_VERSION}}-win32
+                (cd .bin && zip -r ../.out/unlocker-v${{env.BUILD_VERSION}}-win32.zip unlocker-v${{env.BUILD_VERSION}}-win32)
+
+                echo -e "\n###\nLinks for Docker buildx\n"
+                ( \
+                  cd .bin && \
+                  ln -s linux-amd64 unlocker-v${{env.BUILD_VERSION}}-linux-amd64 && \
+                  ln -s linux-arm64 unlocker-v${{env.BUILD_VERSION}}-linux-arm64 && \
+                  ln -s linux-arm-v7 unlocker-v${{env.BUILD_VERSION}}-linux-armv7 \
+                )
+                '
+          echo -e "\n###\nCompilation done\n"
+          ls -al .bin
+          ls -al .out
+
+      # Publish artifacts
+      - name: Publish binaries as artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: artifacts
+          path: .out
+
+      # Create release and upload assets
+      - name: Create release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: ${{ github.ref }}
+          draft: true
+          prerelease: ${{ env.PRERELEASE != '' }}
+
+      - name: Upload release asset unlocker-linux-amd64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: .out/unlocker-v${{env.BUILD_VERSION}}-linux-amd64.tar.gz
+          asset_name: unlocker-v${{env.BUILD_VERSION}}-linux-amd64.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload release asset unlocker-linux-386
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: .out/unlocker-v${{env.BUILD_VERSION}}-linux-386.tar.gz
+          asset_name: unlocker-v${{env.BUILD_VERSION}}-linux-386.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload release asset unlocker-linux-arm64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: .out/unlocker-v${{env.BUILD_VERSION}}-linux-arm64.tar.gz
+          asset_name: unlocker-v${{env.BUILD_VERSION}}-linux-arm64.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload release asset unlocker-linux-armv7
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: .out/unlocker-v${{env.BUILD_VERSION}}-linux-armv7.tar.gz
+          asset_name: unlocker-v${{env.BUILD_VERSION}}-linux-armv7.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload release asset unlocker-macos-x64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: .out/unlocker-v${{env.BUILD_VERSION}}-macos-x64.tar.gz
+          asset_name: unlocker-v${{env.BUILD_VERSION}}-macos-x64.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload release asset unlocker-macos-arm64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: .out/unlocker-v${{env.BUILD_VERSION}}-macos-arm64.tar.gz
+          asset_name: unlocker-v${{env.BUILD_VERSION}}-macos-arm64.tar.gz
+          asset_content_type: application/gzip
+
+      - name: Upload release asset unlocker-win64
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: .out/unlocker-v${{env.BUILD_VERSION}}-win64.zip
+          asset_name: unlocker-v${{env.BUILD_VERSION}}-win64.zip
+          asset_content_type: application/zip
+
+      - name: Upload release asset unlocker-win32
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: .out/unlocker-v${{env.BUILD_VERSION}}-win32.zip
+          asset_name: unlocker-v${{env.BUILD_VERSION}}-win32.zip
+          asset_content_type: application/zip
+
+      - name: Docker build and push
+        id: docker_build
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          tags: |
+            italypaleale/unlocker:${{env.BUILD_VERSION}}
+            italypaleale/unlocker:${{env.BRANCH}}
+            ghcr.io/italypaleale/unlocker:${{env.BUILD_VERSION}}
+            ghcr.io/italypaleale/unlocker:${{env.BRANCH}}
+          push: true
