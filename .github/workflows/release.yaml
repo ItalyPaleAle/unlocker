@@ -185,12 +185,11 @@ jobs:
                 (cd .bin && zip -r ../.out/unlocker-v${{env.BUILD_VERSION}}-win32.zip unlocker-v${{env.BUILD_VERSION}}-win32)
 
                 echo -e "\n###\nLinks for Docker buildx\n"
-                ( \
-                  cd .bin && \
-                  ln -s linux-amd64 unlocker-v${{env.BUILD_VERSION}}-linux-amd64 && \
-                  ln -s linux-arm64 unlocker-v${{env.BUILD_VERSION}}-linux-arm64 && \
-                  ln -s linux-arm-v7 unlocker-v${{env.BUILD_VERSION}}-linux-armv7 \
-                )
+                cd .bin
+                ln -v -s unlocker-v${{env.BUILD_VERSION}}-linux-amd64 linux-amd64 
+                ln -v -s unlocker-v${{env.BUILD_VERSION}}-linux-arm64 linux-arm64 
+                ln -v -s unlocker-v${{env.BUILD_VERSION}}-linux-armv7 linux-arm-v7
+                cd ..
                 '
           echo -e "\n###\nCompilation done\n"
           ls -al .bin
