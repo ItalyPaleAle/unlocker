@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+
+	"github.com/italypaleale/unlocker/utils"
 )
 
 // RouteResult is the handler for the GET /result/:state request
@@ -18,8 +20,11 @@ func (s *Server) RouteResult(c *gin.Context) {
 		return
 	}
 
+	// Check if the user wants a raw response
+	rawResult := utils.IsTruthy(c.Query("raw"))
+
 	// Check if the operation is complete
-	if s.checkOperation(c, stateId) {
+	if s.checkOperation(c, stateId, rawResult) {
 		// Response to the client already sent
 		return
 	}
@@ -38,7 +43,7 @@ func (s *Server) RouteResult(c *gin.Context) {
 			return
 		case <-ticker.C:
 			// Check if there's an update
-			if s.checkOperation(c, stateId) {
+			if s.checkOperation(c, stateId, rawResult) {
 				// Response to the client already sent
 				return
 			}
@@ -46,7 +51,7 @@ func (s *Server) RouteResult(c *gin.Context) {
 	}
 }
 
-func (s *Server) checkOperation(c *gin.Context, stateId string) bool {
+func (s *Server) checkOperation(c *gin.Context, stateId string, rawResult bool) bool {
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
@@ -61,11 +66,15 @@ func (s *Server) checkOperation(c *gin.Context, stateId string) bool {
 	// Check if the operation is done (complete or canceled)
 	if state.Status == StatusComplete {
 		// Respond with the result
-		c.JSON(http.StatusOK, &operationResponse{
-			State: stateId,
-			Done:  true,
-			Value: base64.StdEncoding.EncodeToString(state.Output),
-		})
+		if rawResult {
+			c.Data(http.StatusOK, "application/octet-stream", state.Output)
+		} else {
+			c.JSON(http.StatusOK, &operationResponse{
+				State: stateId,
+				Done:  true,
+				Value: base64.StdEncoding.EncodeToString(state.Output),
+			})
+		}
 		// Remove from the states map
 		delete(s.states, stateId)
 		return true
