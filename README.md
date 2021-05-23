@@ -16,7 +16,7 @@ Unlocker doesn't have standing permission to perform operations on the vault, so
 
 # Using Unlocker
 
-In these section we'll be looking at how to wrap and unwrap a key, which in our example is `helloworld`; Unlocker supports any kind of keys and keyfiles, for both symmetric and asymmetric ciphers.
+In this section we'll be looking at how to wrap and unwrap a key, which in our example is `helloworld`; Unlocker supports any kind of keys and keyfiles, for both symmetric and asymmetric ciphers.
 
 We will use a key called `wrappingkey1` stored inside an Azure Key Vault called `myunlockerkv`. We also assume that Unlocker is available at the address `https://10.20.30.40:8080`.
 
@@ -24,7 +24,7 @@ We will use a key called `wrappingkey1` stored inside an Azure Key Vault called 
 
 ## Configure and start Unlocker
 
-Unlocker runs as a (lightweight) app on a server you control that exposes a HTTPS endpoint. You can install it on the same server where your application that requires the cryptographic key runs or on a separate machine.
+Unlocker runs as a lightweight app on a server you control that exposes a HTTPS endpoint. You can install it on the same server where your application that requires the cryptographic key runs or on a separate machine.
 
 > **Firewall rules:** Unlocker must be deployed on a server that admins can connect to via HTTPS, on a port of your choice. While Unlocker doesn't need to be exposed on the public Internet, your admins must be able to connect to it, even if through a private IP or VPN. Additionally, Unlocker must be able to make outgoing HTTPS requests.
 
@@ -34,7 +34,7 @@ Unlocker requires a configuration file `config.yaml` in one of the following pat
 
 - `/etc/unlocker/config.yaml`
 - `$HOME/.unlocker/config.yaml`
-- Or in the same folder where the unlocker binary is located
+- Or in the same folder where the Unlocker binary is located
 
 You can find an example of the configuration file, and a description of every option, in the [`config.sample.yaml`](/config.sample.yaml) file.
 
@@ -107,7 +107,7 @@ docker run \
   italypaleale/unlocker:0.1
 ```
 
-> Unlocker follows semver for versioning. The command above uses the latest version in the 0.1 branch. We do not publish a `latest` tag.
+> Unlocker follows semver for versioning. The command above uses the latest version in the 0.1 branch. We do not publish a "latest" tag on Docker Hub.
 
 ### Start as standalone app
 
@@ -218,6 +218,14 @@ A **successful**, final response will contain a JSON body similar to:
 
 The `value` field contains the wrapped key, encoded using base64 "standard encoding" with padding included (per [RFC 4648 section 4](https://datatracker.ietf.org/doc/html/rfc4648#section-4)).
 
+The `/result/:state` endpoint accepts an optional `?raw=1` parameter that makes the response contain the (wrapped) key only, as binary data. For example:
+
+```sh
+STATE_ID="4336d140-2ba1-4d7a-af84-a83d564e384b"
+curl --insecure "https://10.20.30.40:8080/result/${STATE_ID}?raw=1"
+# A successful response will contain binary data
+```
+
 Because this value is wrapped, so encrypted, it's safe to store it on your server, next to the application that needs it. When you need the original key (`helloworld`) you can then use the `/unwrap` method to have the key unwrapped as we'll see in the next section.
 
 ### Unwrapping a key
@@ -296,6 +304,13 @@ curl --insecure https://10.20.30.40:8080/result/${STATE_ID} \
 ```
 
 The command above will print the unwrapped key (in our case `helloworld`), in plain text. You can redirect that to a file (adding `> file-name`) or to another app (with a pipe `|`).
+
+Alternatively, the `/result/:state` endpoint accepts an optional `?raw=1` parameter that makes the response contain the unwrapped key only, as binary data. For example:
+
+```sh
+curl --insecure "https://10.20.30.40:8080/result/${STATE_ID}?raw=1"
+# A successful response will contain binary data; in our example that would be "helloworld"
+```
 
 ## Set up
 
