@@ -12,6 +12,8 @@ At a high level, Unlocker exposes two endpoints that can be used to wrap and unw
 
 Unlocker doesn't have standing permission to perform operations on the vault, so every time a request comes in, Unlocker sends a notification to an admin (via a webhook), who can sign into Unlocker via Azure AD and allow (or deny) the operation. Unlocker uses delegated permissions to access the Key Vault, so access is restricted to specific users via Role-Based Access Control on the Azure Key Vault resource.
 
+![Example of a notification sent by Unlocker (to a Discord chat)](/notification-example.png)
+
 # Using Unlocker
 
 In these section we'll be looking at how to wrap and unwrap a key, which in our example is `helloworld`; Unlocker supports any kind of keys and keyfiles, for both symmetric and asymmetric ciphers.
