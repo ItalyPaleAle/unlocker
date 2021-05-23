@@ -36,9 +36,10 @@ bind: "0.0.0.0"
 allowedIps: ""
 
 # Comma-separated lists of origins for CORS
+# Example: "https://url1,https://url2"
 # If empty or unset, will the same as baseUrl
 # To allow any origin, set value to "*"
-#origins: "https://url1,https://url2"
+origins: ""
 
 # Base URL where the application is deployed, used for authentication callbacks and in notifications
 # This URL must be routable by clients (administrators), but doesn't need to be public

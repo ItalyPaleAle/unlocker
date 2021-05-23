@@ -6,13 +6,13 @@ With Unlocker, your keys are wrapped and unwrapped using a RSA-4096 key stored i
 
 As an example, Unlocker can be used to provide an encryption key for starting a long-running application, such as [unlocking encrypted drives at boot time](https://withblue.ink/2020/01/19/auto-mounting-encrypted-drives-with-a-remote-key-on-linux.html). This way, your encryption keys can be stored on your server safely in a wrapped (encrypted) format. By requiring explicit consent from an admin, you can be confident that no one can unwrap your encryption keys without your knowledge and permission.
 
-## How it works
+# How it works
 
 At a high level, Unlocker exposes two endpoints that can be used to wrap and unwrap encryption keys (where "wrapping" and "unwrapping" are synonym for "encrypting" and "decrypting" respectively). These operations are performed on Azure Key Vault, a safe, cloud-based key vault that uses strong RSA-4096 keys.
 
 Unlocker doesn't have standing permission to perform operations on the vault, so every time a request comes in, Unlocker sends a notification to an admin (via a webhook), who can sign into Unlocker via Azure AD and allow (or deny) the operation. Unlocker uses delegated permissions to access the Key Vault, so access is restricted to specific users via Role-Based Access Control on the Azure Key Vault resource.
 
-## Using Unlocker
+# Using Unlocker
 
 In these section we'll be looking at how to wrap and unwrap a key, which in our example is `helloworld`; Unlocker supports any kind of keys and keyfiles, for both symmetric and asymmetric ciphers.
 
@@ -20,13 +20,135 @@ We will use a key called `wrappingkey1` stored inside an Azure Key Vault called 
 
 > Read the [**Set up**](#set-up) section below for how to set up your Unlocker app, the relevant resources on Azure, and how to generate a key inside Key Vault.
 
-### Configure and start Unlocker
+## Configure and start Unlocker
 
-Unlocker runs as a (lightweight) app on a server you control and that offers a HTTPS endpoint. You can install it on the same server where your application that requires the cryptographic key runs, or on a separate machine.
+Unlocker runs as a (lightweight) app on a server you control that exposes a HTTPS endpoint. You can install it on the same server where your application that requires the cryptographic key runs or on a separate machine.
 
 > **Firewall rules:** Unlocker must be deployed on a server that admins can connect to via HTTPS, on a port of your choice. While Unlocker doesn't need to be exposed on the public Internet, your admins must be able to connect to it, even if through a private IP or VPN. Additionally, Unlocker must be able to make outgoing HTTPS requests.
 
-TODO: CONFIGURE, TLS CERT, AND START WITH DOCKER
+### Configuration
+
+Unlocker requires a configuration file `config.yaml` in one of the following paths:
+
+- `/etc/unlocker/config.yaml`
+- `$HOME/.unlocker/config.yaml`
+- Or in the same folder where the unlocker binary is located
+
+You can find an example of the configuration file, and a description of every option, in the [`config.sample.yaml`](/config.sample.yaml) file.
+
+Keys can also be passed as environmental variables with the `UNLOCKER_` prefix.
+
+All configuration options (all strings):
+
+- **`azureClientId`** (**required**):  
+  Client ID of the Azure AD application (see the [Azure AD application](#azure-ad-application) step in the [Set up](#set-up) section below).  
+  Environmental variable name: `UNLOCKER_AZURECLIENTID`
+- **`azureClientSecret`** (**required**):  
+  Client secret of the Azure AD application.  
+  Environmental variable name: `UNLOCKER_AZURECLIENTSECRET`
+- **`azureTenantId`** (**required**):  
+  Tenant ID of the Azure AD application.  
+  Environmental variable name: `UNLOCKER_AZURETENANTID`
+- **`tlsCert`** (optional, default: `tls-cert.pem` in the same folder as the `config.yaml` file):  
+  Path to a TLS certificate (PEM-encoded), or alternatively the entire PEM-encoded certificate as a string. Note that while this value is optional, a TLS certificate is **required** (even if self-signed).  
+  Environmental variable name: `UNLOCKER_TLSCERT`
+- **`tlsKey`** (optional, default: `tls-key.pem` in the same folder as the `config.yaml` file):  
+  Path to a TLS key (PEM-encoded), or alternatively the entire PEM-encoded key as a string. Note that while this value is optional, a TLS certificate is **required** (even if self-signed).  
+  Environmental variable name: `UNLOCKER_TLSKEY`
+- **`webhookUrl`** (**required**):  
+  Endpoint of the webhook, where notifications are sent to.  
+  Environmental variable name: `UNLOCKER_WEBHOOKURL`
+- **`webhookFormat`** (optional, default: `plain`):  
+  The format for the webhook. Currently these two are supported:
+  - `plain` (default): sends a webhook with content type `text/plain`, where the request's body is the entire message.
+  - `slack`: sends a Slack-compatible message (can be used with Discord too)  
+  Environmental variable name: `UNLOCKER_WEBHOOKFORMAT`
+- **`webhookKey`** (optional):  
+  Value for the Authorization header send with the webhook request. Set this if your webhook requires it.  
+  Environmental variable name: `UNLOCKER_WEBHOOKKEY`
+- **`baseUrl`** (optional but **recommended**, default: `https://localhost:8080`):  
+  The URL your application can be reached at. This is used in the links that are sent in webhook notifications.  
+  Environmental variable name: `UNLOCKER_BASEURL`
+- **`port`** (optional, default: `8080`):  
+  Port to bind to.  
+  Environmental variable name: `UNLOCKER_PORT`
+- **`bind`** (optional, default: `0.0.0.0`):  
+  Address/interface to bind to.  
+  Environmental variable name: `UNLOCKER_BIND`
+- **`allowedIps`** (optional):  
+  If set, allows connections to the APIs only from the IPs or ranges set here. You can set individual IP addresses (IPv4 or IPv6) or ranges in the CIDR notation, and you can add multiple values separated by commas. For example, to allow connections from localhost and IPs in the `10.x.x.x` range only, set this to: `127.0.0.1,10.0.0.0/8`.  
+  Note that this value is used to restrict connections to the `/wrap`, `/unwrap`, and `/status` endpoints only. It does not restrict the endpoints used by administrators to confirm (or deny) requests.  
+  Environmental variable name: `UNLOCKER_ALLOWEDIPS`
+- **`origins`** (optional, default is equal to the value of `baseUrl`):  
+  Comma-separated lists of origins that are allowed for CORS. This should be a list of all URLs admins can access Unlocker at. Alternatively, set this to `*` to allow any origin.  
+  Environmental variable name: `UNLOCKER_ORIGINS`
+
+> To generate a self-signed TLS certificate, you can use:
+>
+> ```sh
+> openssl req -x509 -newkey rsa:4096 -keyout tls-key.pem -out tls-cert.pem -days 730 -nodes
+> ```
+
+### Start with Docker
+
+You can run Unlocker in a Docker container. Docker container images are available for Linux and support amd64, arm64, and armv7/armhf.
+
+First, create a folder where you will store the configuration file `config.yaml` and the TLS certificate and key (`tls-cert.pem` and `tls-key.pem`), for example `$HOME/.unlocker`.
+
+You can then start Unlocker with:
+
+```sh
+docker run \
+  -d \
+  -p 8080:8080 \
+  -v $HOME/.unlocker:/etc/unlocker \
+  italypaleale/unlocker:0.1
+```
+
+> Unlocker follows semver for versioning. The command above uses the latest version in the 0.1 branch. We do not publish a `latest` tag.
+
+### Start as standalone app
+
+If you don't want to use Docker (or can't), you can download the latest version of Unlocker from the [Releases](https://github.com/ItalyPaleAle/unlocker/releases) page. Fetch the correct archive for your system and architecture, then extract the files and copy the `unlocker` binary to `/usr/local/bin` or another folder.
+
+Place the configuration for Unlocker in the `/etc/unlocker` folder, including the `config.yaml` file and the TLS certificate and key (`tls-cert.pem` and `tls-key.pem`).
+
+You will need to start Unlocker as a service using the process manager for your system. For modern Linux distributions based on **systemd**, you can use this unit. Copy this file to `/etc/systemd/system/unlocker.service`:
+
+```systemd
+[Unit]
+Description=Unlocker service
+StartLimitInterval=200
+StartLimitBurst=5
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=simple
+Restart=always
+RestartSec=30
+ExecStart=/usr/local/bin/unlocker
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Start the service and enable it at boot with:
+
+```sh
+systemctl enable --now unlocker
+```
+
+Using systemd, you can make your own services depend on unlocker by adding `unlocker.service` as a value for `Wants=` and `After=` in the unit files.
+
+## APIs
+
+There are two main API endpoints you and your application will interact with:
+
+- First, you wrap your keys using the `/wrap` endpoint (see [Wrapping a key](#wrapping-a-key)). This needs to be done just once for each key. You will receive a wrapped (ie. encrypted) key that you can safely store alongside your application.
+- Every time your application needs to retrieve the key (usually when the application starts), it should make a call to the `/unwrap` endpoint (see [Unwrapping a key](#unwrapping-a-key)).
+
+Both the `/wrap` and `/unwrap` endpoints return a unique operation ID ("state") that your application can then use with the `/result` endpoint to retrieve the wrapped or unwrapped key after an admin approved the request. Read below for details on how it works.
 
 ### Wrapping a key
 
@@ -302,6 +424,6 @@ az ad app credential reset \
 
 Take note of the output of the last command, which includes the values for the `config.yaml` file:
 
-- `appId` is the value for `azure.clientId`
-- `password` is the value for `azure.clientSecret`
-- `tenant` is the value for `azure.tenantId`
+- `appId` is the value for `azureClientId`
+- `password` is the value for `azureClientSecret`
+- `tenant` is the value for `azureTenantId`
