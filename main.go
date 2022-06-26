@@ -65,6 +65,12 @@ func loadConfig() {
 	viper.AddConfigPath("$HOME/.unlocker")
 	viper.AddConfigPath("/etc/unlocker")
 
+	// Check if we have a specific config file to load
+	confFile := os.Getenv("UNLOCKER_CONFIG")
+	if confFile != "" {
+		viper.SetConfigFile(confFile)
+	}
+
 	// Read the config
 	err := viper.ReadInConfig()
 	if err != nil {

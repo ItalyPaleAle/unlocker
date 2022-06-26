@@ -41,7 +41,7 @@ func (s *Server) AllowIpMiddleware() (gin.HandlerFunc, error) {
 	// Return the middleware
 	return func(c *gin.Context) {
 		// Get the IP connecting
-		ip, _ := c.RemoteIP()
+		ip := net.ParseIP(c.RemoteIP())
 		if ip == nil {
 			c.Error(errors.New("invalid remote IP address"))
 			c.AbortWithStatusJSON(http.StatusInternalServerError, map[string]string{"error": "Internal error"})

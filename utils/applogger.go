@@ -5,8 +5,8 @@ import (
 	"regexp"
 	"time"
 
-	jwt "github.com/form3tech-oss/jwt-go"
 	"github.com/gin-gonic/gin"
+	jwt "github.com/golang-jwt/jwt/v4"
 	"github.com/rs/zerolog"
 )
 
