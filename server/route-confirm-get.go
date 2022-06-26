@@ -31,13 +31,13 @@ func (s *Server) RouteConfirmGet(c *gin.Context) {
 	// Ensure we have the required params in the querystring
 	code := c.Query("code")
 	if code == "" {
-		c.Error(errors.New("Missing parameter code in the request"))
+		_ = c.Error(errors.New("Missing parameter code in the request"))
 		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Invalid request"))
 		return
 	}
 	stateId := c.Query("state")
 	if stateId == "" {
-		c.Error(errors.New("Parameter state is missing in the request"))
+		_ = c.Error(errors.New("Parameter state is missing in the request"))
 		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Invalid request"))
 		return
 	}
@@ -45,7 +45,7 @@ func (s *Server) RouteConfirmGet(c *gin.Context) {
 	// Get the state object
 	state, ok := s.states[stateId]
 	if !ok || state == nil {
-		c.Error(errors.New("State object not found or expired"))
+		_ = c.Error(errors.New("State object not found or expired"))
 		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("State not found or expired"))
 		return
 	}
@@ -57,7 +57,7 @@ func (s *Server) RouteConfirmGet(c *gin.Context) {
 	// Exchange the code for an access token
 	token, err := s.requestAccessToken(code)
 	if err != nil {
-		c.Error(err)
+		_ = c.Error(err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, ErrorResponse("Error obtaining access token"))
 		return
 	}

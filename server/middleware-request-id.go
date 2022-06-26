@@ -12,7 +12,7 @@ func (s *Server) RequestIdMiddleware(c *gin.Context) {
 	// Generate a new UUID
 	reqUuid, err := uuid.NewRandom()
 	if err != nil {
-		c.AbortWithError(http.StatusInternalServerError, err)
+		_ = c.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
 

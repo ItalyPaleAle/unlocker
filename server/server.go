@@ -104,7 +104,7 @@ func (s *Server) Init(log *utils.AppLogger) error {
 	s.router.Use(cors.New(corsConfig))
 
 	// Logger middleware that removes the auth code from the URL
-	codeFilterLogMw := s.log.LoggerMaskMiddleware(regexp.MustCompile("(\\?|&)(code=)([^&]*)"), "$1$2***")
+	codeFilterLogMw := s.log.LoggerMaskMiddleware(regexp.MustCompile(`(\?|&)(code=)([^&]*)`), "$1$2***")
 
 	// HTML template for the confirmation page
 	confirmPageTpl, err := template.New("confirm-page").Parse(confirmPage)

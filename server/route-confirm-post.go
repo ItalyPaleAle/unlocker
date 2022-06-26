@@ -16,7 +16,7 @@ func (s *Server) RouteConfirmPost(c *gin.Context) {
 	req := &confirmRequest{}
 	err := c.Bind(req)
 	if err != nil {
-		c.Error(err)
+		_ = c.Error(err)
 		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Invalid request body"))
 		return
 	}
@@ -29,7 +29,7 @@ func (s *Server) RouteConfirmPost(c *gin.Context) {
 	s.lock.Lock()
 	state, ok := s.states[req.StateId]
 	if !ok || state == nil {
-		c.Error(errors.New("State object not found or expired"))
+		_ = c.Error(errors.New("State object not found or expired"))
 		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("State not found or expired"))
 		s.lock.Unlock()
 		return
@@ -68,7 +68,7 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestSta
 	akv := keyvault.Client{}
 	err := akv.Init(state.Token.AccessToken)
 	if err != nil {
-		c.Error(err)
+		_ = c.Error(err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, InternalServerError)
 		return
 	}
@@ -78,7 +78,7 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestSta
 	if keyVersion == "" {
 		keyVersion, err = akv.GetKeyLastVersion(state.Vault, state.KeyId)
 		if err != nil {
-			c.Error(err)
+			_ = c.Error(err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, InternalServerError)
 			return
 		}
@@ -93,7 +93,7 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestSta
 		output, err = akv.UnwrapKey(keyUrl, state.Input)
 	}
 	if err != nil {
-		c.Error(err)
+		_ = c.Error(err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, InternalServerError)
 		return
 	}

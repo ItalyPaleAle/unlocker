@@ -20,7 +20,7 @@ func (s *Server) RouteWrapUnwrap(op requestOperation) gin.HandlerFunc {
 		req := &keyRequest{}
 		err := c.Bind(req)
 		if err != nil {
-			c.Error(err)
+			_ = c.Error(err)
 			c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Invalid request body"))
 			return
 		}
@@ -41,7 +41,7 @@ func (s *Server) RouteWrapUnwrap(op requestOperation) gin.HandlerFunc {
 		}
 		val, err := utils.DecodeBase64String(req.Value)
 		if err != nil {
-			c.Error(err)
+			_ = c.Error(err)
 			c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Invalid value format"))
 			return
 		}
@@ -55,7 +55,7 @@ func (s *Server) RouteWrapUnwrap(op requestOperation) gin.HandlerFunc {
 		// First, store the request in the states map
 		stateUuid, err := uuid.NewRandom()
 		if err != nil {
-			c.Error(err)
+			_ = c.Error(err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, InternalServerError)
 			return
 		}
@@ -86,7 +86,7 @@ func (s *Server) RouteWrapUnwrap(op requestOperation) gin.HandlerFunc {
 			Requestor:     ip,
 		})
 		if err != nil {
-			c.Error(err)
+			_ = c.Error(err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, ErrorResponse("Error sending webhook"))
 			return
 		}
