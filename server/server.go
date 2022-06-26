@@ -159,11 +159,10 @@ func (s *Server) launchServer(bindAddr string, bindPort int) error {
 		return err
 	}
 	httpSrv := &http.Server{
-		Addr:           fmt.Sprintf("%s:%d", bindAddr, bindPort),
-		Handler:        s.router,
-		MaxHeaderBytes: 1 << 20,
-		ReadTimeout:    10 * time.Second,
-		WriteTimeout:   10 * time.Second,
+		Addr:              fmt.Sprintf("%s:%d", bindAddr, bindPort),
+		Handler:           s.router,
+		MaxHeaderBytes:    1 << 20,
+		ReadHeaderTimeout: 10 * time.Second,
 		TLSConfig: &tls.Config{
 			MinVersion:   tls.VersionTLS12,
 			Certificates: tlsCert,
