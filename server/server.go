@@ -26,6 +26,9 @@ import (
 //go:embed confirm-page.html
 var confirmPage string
 
+// Interval to run garbage collection to remove expired requests
+const cleanupInterval = 30 * time.Second
+
 // Server is the server based on Gin
 type Server struct {
 	ctx        context.Context
@@ -241,7 +244,7 @@ func (s *Server) notifySubscriber(stateId string, state *requestState) {
 // Starts a goroutine that periodically removes expired states
 func (s *Server) statesCleanup() {
 	go func() {
-		ticker := time.NewTicker(5 * time.Second)
+		ticker := time.NewTicker(cleanupInterval)
 		for range ticker.C {
 			// Iterate through states and look for expired ones
 			s.lock.Lock()
@@ -287,20 +290,25 @@ func (s *Server) loadTLSCert() ([]tls.Certificate, error) {
 	return []tls.Certificate{obj}, nil
 }
 
+type requestOperation uint8
+
 const (
-	OperationWrap = iota
+	OperationWrap requestOperation = iota
 	OperationUnwrap
 )
 
+type requestStatus uint8
+
 const (
-	StatusPending = iota
+	StatusPending requestStatus = iota
 	StatusComplete
 	StatusCanceled
 )
 
 type requestState struct {
-	Status     int
-	Operation  int
+	Status     requestStatus
+	Operation  requestOperation
+	Processing bool
 	Input      []byte
 	Output     []byte
 	Vault      string

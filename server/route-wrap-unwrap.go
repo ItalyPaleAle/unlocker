@@ -14,7 +14,7 @@ import (
 const DefaultRequestTimeout = 300
 
 // RouteWrapUnwrap is the handler for the POST /wrap and /unwrap request
-func (s *Server) RouteWrapUnwrap(op int) gin.HandlerFunc {
+func (s *Server) RouteWrapUnwrap(op requestOperation) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get the fields from the body
 		req := &keyRequest{}

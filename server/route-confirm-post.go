@@ -25,36 +25,45 @@ func (s *Server) RouteConfirmPost(c *gin.Context) {
 		return
 	}
 
-	// TODO: Use a lock for each state ID
+	// Get the request
 	s.lock.Lock()
-	defer s.lock.Unlock()
-
 	state, ok := s.states[req.StateId]
 	if !ok || state == nil {
 		c.Error(errors.New("State object not found or expired"))
 		c.AbortWithStatusJSON(http.StatusBadRequest, map[string]string{"error": "State not found or expired"})
+		s.lock.Unlock()
 		return
 	}
 	if state.Status != StatusPending {
 		c.AbortWithStatusJSON(http.StatusBadRequest, map[string]string{"error": "Request already completed"})
+		s.lock.Unlock()
+		return
+	}
+	if state.Processing {
+		c.AbortWithStatusJSON(http.StatusBadRequest, map[string]string{"error": "Request is already being processed"})
+		s.lock.Unlock()
 		return
 	}
 	if (req.Confirm && req.Cancel) || (!req.Confirm && !req.Cancel) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, map[string]string{"error": "One and only one of confirm and cancel must be set to true in the body"})
+		s.lock.Unlock()
 		return
 	}
 
+	// Set processing flag
+	// It's safe then to release the lock as no other goroutine can alter this request then
+	state.Processing = true
+	s.lock.Unlock()
+
 	if req.Cancel {
-		s.handleCancel(c, req.StateId)
+		s.handleCancel(c, req.StateId, state)
 	} else if req.Confirm {
-		s.handleConfirm(c, req.StateId)
+		s.handleConfirm(c, req.StateId, state)
 	}
 }
 
 // Handle confirmation of operations
-func (s *Server) handleConfirm(c *gin.Context, stateId string) {
-	state := s.states[stateId]
-
+func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestState) {
 	// Init the Key Vault client
 	akv := keyvault.Client{}
 	err := akv.Init(state.Token.AccessToken)
@@ -65,8 +74,9 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string) {
 	}
 
 	// Check if we need to retrieve the key version
-	if state.KeyVersion == "" {
-		state.KeyVersion, err = akv.GetKeyLastVersion(state.Vault, state.KeyId)
+	keyVersion := state.KeyVersion
+	if keyVersion == "" {
+		keyVersion, err = akv.GetKeyLastVersion(state.Vault, state.KeyId)
 		if err != nil {
 			c.Error(err)
 			c.AbortWithStatusJSON(http.StatusInternalServerError, map[string]string{"error": "Internal error"})
@@ -76,7 +86,7 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string) {
 
 	// Make the request
 	var output []byte
-	keyUrl := akv.KeyUrl(state.Vault, state.KeyId, state.KeyVersion)
+	keyUrl := akv.KeyUrl(state.Vault, state.KeyId, keyVersion)
 	if state.Operation == OperationWrap {
 		output, err = akv.WrapKey(keyUrl, state.Input)
 	} else if state.Operation == OperationUnwrap {
@@ -87,6 +97,10 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string) {
 		c.AbortWithStatusJSON(http.StatusInternalServerError, map[string]string{"error": "Internal error"})
 		return
 	}
+
+	// Re-acquire a lock before modifying the state object and sending a notification
+	s.lock.Lock()
+	defer s.lock.Unlock()
 
 	// Store the result and mark as complete
 	state.Output = output
@@ -102,9 +116,12 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string) {
 }
 
 // Handle cancellation of operations
-func (s *Server) handleCancel(c *gin.Context, stateId string) {
+func (s *Server) handleCancel(c *gin.Context, stateId string, state *requestState) {
+	// Re-acquire a lock before modifying the state object and sending a notification
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	// Mark the request as canceled and remove the input and access token
-	state := s.states[stateId]
 	state.Input = nil
 	state.Status = StatusCanceled
 

@@ -49,7 +49,7 @@ func (s *Server) RouteResult(c *gin.Context) {
 			// Client has probably disconnected at this point, but just respond with the pending message
 			s.sendResponse(c, stateId, pendingReq, rawResult)
 			return
-		case state := <-watch:
+		case state = <-watch:
 			// If res is nil, the channel was closed (perhaps because another request evicted this), so respond with the pending message
 			if state == nil {
 				state = pendingReq
