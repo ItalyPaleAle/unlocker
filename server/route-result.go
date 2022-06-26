@@ -15,7 +15,7 @@ func (s *Server) RouteResult(c *gin.Context) {
 	// Get the state parameter
 	stateId := c.Param("state")
 	if stateId == "" {
-		c.AbortWithStatusJSON(http.StatusBadRequest, map[string]string{"error": "Missing parameter state"})
+		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Missing parameter state"))
 		return
 	}
 
@@ -26,7 +26,7 @@ func (s *Server) RouteResult(c *gin.Context) {
 	s.lock.Lock()
 	state, ok := s.states[stateId]
 	if !ok || state == nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, map[string]string{"error": "State not found or expired"})
+		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("State not found or expired"))
 		s.lock.Unlock()
 		return
 	}

@@ -17,11 +17,11 @@ func (s *Server) RouteConfirmPost(c *gin.Context) {
 	err := c.Bind(req)
 	if err != nil {
 		c.Error(err)
-		c.AbortWithStatusJSON(http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Invalid request body"))
 		return
 	}
 	if req.StateId == "" {
-		c.AbortWithStatusJSON(http.StatusBadRequest, map[string]string{"error": "Missing state in request body"})
+		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Missing state in request body"))
 		return
 	}
 
@@ -30,22 +30,22 @@ func (s *Server) RouteConfirmPost(c *gin.Context) {
 	state, ok := s.states[req.StateId]
 	if !ok || state == nil {
 		c.Error(errors.New("State object not found or expired"))
-		c.AbortWithStatusJSON(http.StatusBadRequest, map[string]string{"error": "State not found or expired"})
+		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("State not found or expired"))
 		s.lock.Unlock()
 		return
 	}
 	if state.Status != StatusPending {
-		c.AbortWithStatusJSON(http.StatusBadRequest, map[string]string{"error": "Request already completed"})
+		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Request already completed"))
 		s.lock.Unlock()
 		return
 	}
 	if state.Processing {
-		c.AbortWithStatusJSON(http.StatusBadRequest, map[string]string{"error": "Request is already being processed"})
+		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Request is already being processed"))
 		s.lock.Unlock()
 		return
 	}
 	if (req.Confirm && req.Cancel) || (!req.Confirm && !req.Cancel) {
-		c.AbortWithStatusJSON(http.StatusBadRequest, map[string]string{"error": "One and only one of confirm and cancel must be set to true in the body"})
+		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("One and only one of confirm and cancel must be set to true in the body"))
 		s.lock.Unlock()
 		return
 	}
@@ -69,7 +69,7 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestSta
 	err := akv.Init(state.Token.AccessToken)
 	if err != nil {
 		c.Error(err)
-		c.AbortWithStatusJSON(http.StatusInternalServerError, map[string]string{"error": "Internal error"})
+		c.AbortWithStatusJSON(http.StatusInternalServerError, InternalServerError)
 		return
 	}
 
@@ -79,7 +79,7 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestSta
 		keyVersion, err = akv.GetKeyLastVersion(state.Vault, state.KeyId)
 		if err != nil {
 			c.Error(err)
-			c.AbortWithStatusJSON(http.StatusInternalServerError, map[string]string{"error": "Internal error"})
+			c.AbortWithStatusJSON(http.StatusInternalServerError, InternalServerError)
 			return
 		}
 	}
@@ -94,7 +94,7 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestSta
 	}
 	if err != nil {
 		c.Error(err)
-		c.AbortWithStatusJSON(http.StatusInternalServerError, map[string]string{"error": "Internal error"})
+		c.AbortWithStatusJSON(http.StatusInternalServerError, InternalServerError)
 		return
 	}
 

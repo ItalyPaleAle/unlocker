@@ -14,17 +14,17 @@ func (s *Server) RouteAuth(c *gin.Context) {
 	// Get the state from the querystring
 	stateId := c.Query("state")
 	if stateId == "" {
-		c.AbortWithStatusJSON(http.StatusBadRequest, map[string]string{"error": "Missing parameter state"})
+		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Missing parameter state"))
 		return
 	}
 	// Ensure the state is valid
 	state, ok := s.states[stateId]
 	if !ok || state == nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, map[string]string{"error": "State not found or expired"})
+		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("State not found or expired"))
 		return
 	}
 	if state.Status != StatusPending {
-		c.AbortWithStatusJSON(http.StatusBadRequest, map[string]string{"error": "Request already completed"})
+		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Request already completed"))
 		return
 	}
 

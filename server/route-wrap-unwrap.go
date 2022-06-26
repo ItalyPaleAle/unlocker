@@ -21,19 +21,19 @@ func (s *Server) RouteWrapUnwrap(op requestOperation) gin.HandlerFunc {
 		err := c.Bind(req)
 		if err != nil {
 			c.Error(err)
-			c.AbortWithStatusJSON(http.StatusBadRequest, map[string]string{"error": "Invalid request body"})
+			c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Invalid request body"))
 			return
 		}
 		if req.Vault == "" {
-			c.AbortWithStatusJSON(http.StatusBadRequest, map[string]string{"error": "Missing parameter vault"})
+			c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Missing parameter vault"))
 			return
 		}
 		if req.KeyId == "" {
-			c.AbortWithStatusJSON(http.StatusBadRequest, map[string]string{"error": "Missing parameter keyId"})
+			c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Missing parameter keyId"))
 			return
 		}
 		if req.Value == "" {
-			c.AbortWithStatusJSON(http.StatusBadRequest, map[string]string{"error": "Missing parameter value"})
+			c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Missing parameter value"))
 			return
 		}
 		if req.Timeout < 1 {
@@ -42,7 +42,7 @@ func (s *Server) RouteWrapUnwrap(op requestOperation) gin.HandlerFunc {
 		val, err := utils.DecodeBase64String(req.Value)
 		if err != nil {
 			c.Error(err)
-			c.AbortWithStatusJSON(http.StatusBadRequest, map[string]string{"error": "Invalid value format"})
+			c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Invalid value format"))
 			return
 		}
 
@@ -56,7 +56,7 @@ func (s *Server) RouteWrapUnwrap(op requestOperation) gin.HandlerFunc {
 		stateUuid, err := uuid.NewRandom()
 		if err != nil {
 			c.Error(err)
-			c.AbortWithStatusJSON(http.StatusInternalServerError, map[string]string{"error": "Internal error"})
+			c.AbortWithStatusJSON(http.StatusInternalServerError, InternalServerError)
 			return
 		}
 		stateId := stateUuid.String()
@@ -87,7 +87,7 @@ func (s *Server) RouteWrapUnwrap(op requestOperation) gin.HandlerFunc {
 		})
 		if err != nil {
 			c.Error(err)
-			c.AbortWithStatusJSON(http.StatusInternalServerError, map[string]string{"error": "Error sending webhook"})
+			c.AbortWithStatusJSON(http.StatusInternalServerError, ErrorResponse("Error sending webhook"))
 			return
 		}
 

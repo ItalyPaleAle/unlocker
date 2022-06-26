@@ -32,13 +32,13 @@ func (s *Server) RouteConfirmGet(c *gin.Context) {
 	code := c.Query("code")
 	if code == "" {
 		c.Error(errors.New("Missing parameter code in the request"))
-		c.AbortWithStatusJSON(http.StatusBadRequest, map[string]string{"error": "Invalid request"})
+		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Invalid request"))
 		return
 	}
 	stateId := c.Query("state")
 	if stateId == "" {
 		c.Error(errors.New("Parameter state is missing in the request"))
-		c.AbortWithStatusJSON(http.StatusBadRequest, map[string]string{"error": "Invalid request"})
+		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Invalid request"))
 		return
 	}
 
@@ -46,11 +46,11 @@ func (s *Server) RouteConfirmGet(c *gin.Context) {
 	state, ok := s.states[stateId]
 	if !ok || state == nil {
 		c.Error(errors.New("State object not found or expired"))
-		c.AbortWithStatusJSON(http.StatusBadRequest, map[string]string{"error": "State not found or expired"})
+		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("State not found or expired"))
 		return
 	}
 	if state.Status != StatusPending {
-		c.AbortWithStatusJSON(http.StatusBadRequest, map[string]string{"error": "Request already completed"})
+		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Request already completed"))
 		return
 	}
 
@@ -58,7 +58,7 @@ func (s *Server) RouteConfirmGet(c *gin.Context) {
 	token, err := s.requestAccessToken(code)
 	if err != nil {
 		c.Error(err)
-		c.AbortWithStatusJSON(http.StatusInternalServerError, map[string]string{"error": "Error obtaining access token"})
+		c.AbortWithStatusJSON(http.StatusInternalServerError, ErrorResponse("Error obtaining access token"))
 		return
 	}
 	state.Token = token
