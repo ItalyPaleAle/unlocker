@@ -3,7 +3,6 @@ package server
 import (
 	"encoding/base64"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -23,48 +22,54 @@ func (s *Server) RouteResult(c *gin.Context) {
 	// Check if the user wants a raw response
 	rawResult := utils.IsTruthy(c.Query("raw"))
 
-	// Check if the operation is complete
-	if s.checkOperation(c, stateId, rawResult) {
-		// Response to the client already sent
+	// Get the state and ensure the it's valid
+	s.lock.Lock()
+	state, ok := s.states[stateId]
+	if !ok || state == nil {
+		c.AbortWithStatusJSON(http.StatusBadRequest, map[string]string{"error": "State not found or expired"})
+		s.lock.Unlock()
+		return
+	}
+	// Check if the operation is already complete
+	if state.Status != StatusPending {
+		// Send the response
+		s.sendResponse(c, stateId, state, rawResult)
+		s.lock.Unlock()
 		return
 	}
 
-	// Now, wait to see if the request is completed, or if the context is done
-	ticker := time.NewTicker(100 * time.Millisecond)
-	defer ticker.Stop()
+	// Subscribe to the state and wait till the request is complete, or if the context is done
+	watch := s.subscribeToState(stateId)
+	s.lock.Unlock()
+
+	pendingReq := &requestState{Status: StatusPending}
 	for {
 		select {
 		case <-c.Request.Context().Done():
 			// Client has probably disconnected at this point, but just respond with the pending message
-			c.JSON(http.StatusAccepted, operationResponse{
-				State:   stateId,
-				Pending: true,
-			})
+			s.sendResponse(c, stateId, pendingReq, rawResult)
 			return
-		case <-ticker.C:
-			// Check if there's an update
-			if s.checkOperation(c, stateId, rawResult) {
-				// Response to the client already sent
-				return
+		case state := <-watch:
+			// If res is nil, the channel was closed (perhaps because another request evicted this), so respond with the pending message
+			if state == nil {
+				state = pendingReq
 			}
+			// Send the response
+			s.sendResponse(c, stateId, state, rawResult)
+			return
 		}
 	}
 }
 
-func (s *Server) checkOperation(c *gin.Context, stateId string, rawResult bool) bool {
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	// Get the state and ensure the it's valid
-	// We re-check this every time in case the operation was removed in the meanwhile
-	state, ok := s.states[stateId]
-	if !ok || state == nil {
-		c.AbortWithStatusJSON(http.StatusBadRequest, map[string]string{"error": "State not found or expired"})
-		return true
-	}
-
+func (s *Server) sendResponse(c *gin.Context, stateId string, state *requestState, rawResult bool) {
 	// Check if the operation is done (complete or canceled)
-	if state.Status == StatusComplete {
+	switch state.Status {
+	case StatusPending:
+		c.JSON(http.StatusAccepted, &operationResponse{
+			State:   stateId,
+			Pending: true,
+		})
+	case StatusComplete:
 		// Respond with the result
 		if rawResult {
 			c.Data(http.StatusOK, "application/octet-stream", state.Output)
@@ -77,8 +82,7 @@ func (s *Server) checkOperation(c *gin.Context, stateId string, rawResult bool) 
 		}
 		// Remove from the states map
 		delete(s.states, stateId)
-		return true
-	} else if state.Status == StatusCanceled {
+	case StatusCanceled:
 		// It's been canceled, so tell the client
 		c.JSON(http.StatusConflict, &operationResponse{
 			State:  stateId,
@@ -86,8 +90,5 @@ func (s *Server) checkOperation(c *gin.Context, stateId string, rawResult bool) 
 		})
 		// Remove from the states map
 		delete(s.states, stateId)
-		return true
 	}
-
-	return false
 }

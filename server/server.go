@@ -35,6 +35,10 @@ type Server struct {
 	states     map[string]*requestState
 	lock       *sync.Mutex
 	webhook    *utils.Webhook
+	// Subscriptions to watch for state changes
+	// Each state can only have one subscription
+	// If another call tries to subscribe to the same state, it will evict the first call
+	subs map[string]chan *requestState
 }
 
 // Init the Server object and create a Gin server
@@ -42,6 +46,7 @@ func (s *Server) Init(log *utils.AppLogger) error {
 	s.log = log
 	s.states = map[string]*requestState{}
 	s.lock = &sync.Mutex{}
+	s.subs = map[string]chan *requestState{}
 
 	// Set Gin to Release mode
 	gin.SetMode(gin.ReleaseMode)
@@ -52,7 +57,7 @@ func (s *Server) Init(log *utils.AppLogger) error {
 
 	// Init a HTTP client
 	s.httpClient = &http.Client{
-		Timeout: 10 * time.Second,
+		Timeout: 15 * time.Second,
 	}
 
 	// Create the Gin router and add various middlewares
@@ -94,8 +99,8 @@ func (s *Server) Init(log *utils.AppLogger) error {
 	}
 	s.router.Use(cors.New(corsConfig))
 
-	// Regexp that removes the auth code from the URL
-	codeFilterExp := regexp.MustCompile("(\\?|&)(code=)([^&]*)")
+	// Logger middleware that removes the auth code from the URL
+	codeFilterLogMw := s.log.LoggerMaskMiddleware(regexp.MustCompile("(\\?|&)(code=)([^&]*)"), "$1$2***")
 
 	// HTML template for the confirmation page
 	confirmPageTpl, err := template.New("confirm-page").Parse(confirmPage)
@@ -115,7 +120,7 @@ func (s *Server) Init(log *utils.AppLogger) error {
 	s.router.POST("/unwrap", allowIpMw, s.RouteWrapUnwrap(OperationUnwrap))
 	s.router.GET("/result/:state", allowIpMw, s.RouteResult)
 	s.router.GET("/auth", s.RouteAuth)
-	s.router.GET("/confirm", s.log.LoggerMaskMiddleware(codeFilterExp, "$1$2***"), s.RouteConfirmGet)
+	s.router.GET("/confirm", codeFilterLogMw, s.RouteConfirmGet)
 	s.router.POST("/confirm", s.RouteConfirmPost)
 
 	// Start the background worker that cleans up all states
@@ -172,7 +177,7 @@ func (s *Server) launchServer(bindAddr string, bindPort int) error {
 		// Next call blocks until the server is shut down
 		err := httpSrv.ListenAndServeTLS("", "")
 		if err != http.ErrServerClosed {
-			panic(err)
+			s.log.Raw().Panic().Msgf("Error starting server: %v", err)
 		}
 	}()
 
@@ -200,6 +205,39 @@ func (s *Server) launchServer(bindAddr string, bindPort int) error {
 	return nil
 }
 
+// Adds a subscription to a state by key
+// If another subscription to the same key exists, evicts that first
+// Important: invocations must be wrapped in s.lock being locked
+func (s *Server) subscribeToState(stateId string) chan *requestState {
+	ch, ok := s.subs[stateId]
+	if ok && ch != nil {
+		// Close the previous subscription
+		close(ch)
+	}
+
+	// Create a new subscription
+	ch = make(chan *requestState)
+	s.subs[stateId] = ch
+	return ch
+}
+
+// Sends a notification to a state subscriber, if any
+// The channel is then closed right after
+// Important: invocations must be wrapped in s.lock being locked
+func (s *Server) notifySubscriber(stateId string, state *requestState) {
+	ch, ok := s.subs[stateId]
+	if !ok || ch == nil {
+		return
+	}
+
+	// Send the notification
+	ch <- state
+
+	// Close the channel and remove it from the subscribers
+	close(ch)
+	delete(s.subs, stateId)
+}
+
 // Starts a goroutine that periodically removes expired states
 func (s *Server) statesCleanup() {
 	go func() {
@@ -213,6 +251,17 @@ func (s *Server) statesCleanup() {
 					s.log.Raw().Info().Msg("Removed expired operation " + k)
 					delete(s.states, k)
 				}
+			}
+			// Iterate through subscriptions to find those that are for expired states
+			for k, v := range s.subs {
+				_, ok := s.states[k]
+				if ok {
+					continue
+				}
+				if v != nil {
+					close(v)
+				}
+				delete(s.subs, k)
 			}
 			s.lock.Unlock()
 		}

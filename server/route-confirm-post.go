@@ -24,6 +24,11 @@ func (s *Server) RouteConfirmPost(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, map[string]string{"error": "Missing state in request body"})
 		return
 	}
+
+	// TODO: Use a lock for each state ID
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
 	state, ok := s.states[req.StateId]
 	if !ok || state == nil {
 		c.Error(errors.New("State object not found or expired"))
@@ -48,8 +53,6 @@ func (s *Server) RouteConfirmPost(c *gin.Context) {
 
 // Handle confirmation of operations
 func (s *Server) handleConfirm(c *gin.Context, stateId string) {
-	s.lock.Lock()
-	defer s.lock.Unlock()
 	state := s.states[stateId]
 
 	// Init the Key Vault client
@@ -93,20 +96,24 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string) {
 	// Response
 	c.Set("log-message", "Done: "+stateId)
 	c.JSON(http.StatusOK, map[string]bool{"done": true})
+
+	// Send a notification to the subscriber if any
+	s.notifySubscriber(stateId, state)
 }
 
-// Handle cancelation of operations
+// Handle cancellation of operations
 func (s *Server) handleCancel(c *gin.Context, stateId string) {
 	// Mark the request as canceled and remove the input and access token
-	s.lock.Lock()
 	state := s.states[stateId]
 	state.Input = nil
 	state.Status = StatusCanceled
-	s.lock.Unlock()
 
 	// Response
 	c.Set("log-message", "Operation canceled: "+stateId)
 	c.JSON(http.StatusOK, map[string]bool{"canceled": true})
+
+	// Send a notification to the subscriber if any
+	s.notifySubscriber(stateId, state)
 }
 
 type confirmRequest struct {
