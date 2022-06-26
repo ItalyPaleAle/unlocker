@@ -104,10 +104,10 @@ docker run \
   -d \
   -p 8080:8080 \
   -v $HOME/.unlocker:/etc/unlocker \
-  italypaleale/unlocker:0.1
+  ghcr.io/italypaleale/unlocker:0.1
 ```
 
-> Unlocker follows semver for versioning. The command above uses the latest version in the 0.1 branch. We do not publish a "latest" tag on Docker Hub.
+> Unlocker follows semver for versioning. The command above uses the latest version in the 0.1 branch. We do not publish a container image tagged "latest".
 
 ### Start as standalone app
 
