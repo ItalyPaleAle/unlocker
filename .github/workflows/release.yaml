@@ -8,8 +8,9 @@ on:
       - 'v*'
 
 env:
-  GO_BUILDER_IMAGE: 'golang:1.16-alpine'
-  
+  GO_VERSION: "^1.18"
+  CGO_ENABLED: "0"
+
 jobs:
 
   build:
@@ -18,13 +19,17 @@ jobs:
     steps:
 
       - name: Check out code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
+
+      - uses: actions/setup-go@v3
+        with:
+          go-version: $GO_VERSION
 
       - name: Set variables
         run: |
           mkdir -p .bin
           # Fetch semver: https://github.com/fsaintjacques/semver-tool
-          curl https://raw.githubusercontent.com/fsaintjacques/semver-tool/3.0.0/src/semver > .bin/semver
+          curl https://raw.githubusercontent.com/fsaintjacques/semver-tool/3.3.0/src/semver > .bin/semver
           chmod +x .bin/semver
 
           # Trim the first 10 characters, which are "refs/tags/"
@@ -75,100 +80,90 @@ jobs:
 
       - name: Build for all platforms
         run: |
-          mkdir -p .bin
-          # Build using Docker
-          # Disable CGO so the binary is fully static
-          docker run \
-            --rm \
-            -v "$PWD":/usr/src/myapp \
-            -w /usr/src/myapp \
-            -e CGO_ENABLED=0 \
-            -e GO111MODULE=on \
-            ${{env.GO_BUILDER_IMAGE}} \
-              sh -c '
-                set -e
-                mkdir -p .out
+          mkdir -p .bin .out
 
-                echo -e "###\nInstall zip, git\n"
-                apk add zip git
+          echo -e "\n###\nFetching modules\n"
+          go get -v
 
-                echo -e "\n###\nFetching modules\n"
-                go get -v
+          echo -e "\n###\nSetting BUILD_LDFLAGS\n"
+          BUILDINFO_PKG="github.com/italypaleale/unlocker/buildinfo"
+          BUILD_LDFLAGS="-X ${BUILDINFO_PKG}.Production=1 -X ${BUILDINFO_PKG}.AppVersion=${{env.BUILD_VERSION}} -X ${BUILDINFO_PKG}.BuildId=${{env.BUILD_ID}} -X ${BUILDINFO_PKG}.BuildDate=${{env.BUILD_DATE}} -X ${BUILDINFO_PKG}.CommitHash=${{env.COMMIT_HASH}}"
 
-                echo -e "\n###\nBuilding linux/amd64\n"
-                mkdir .bin/unlocker-v${{env.BUILD_VERSION}}-linux-amd64
-                GOOS=linux \
-                GOARCH=amd64 \
-                  go build \
-                    -ldflags "-X github.com/italypaleale/unlocker/buildinfo.Production=1 -X github.com/italypaleale/unlocker/buildinfo.AppVersion=${{env.BUILD_VERSION}} -X github.com/italypaleale/unlocker/buildinfo.BuildId=${{env.BUILD_ID}} -X github.com/italypaleale/unlocker/buildinfo.BuildDate=${{env.BUILD_DATE}} -X github.com/italypaleale/unlocker/buildinfo.CommitHash=${{env.COMMIT_HASH}}" \
-                    -o .bin/unlocker-v${{env.BUILD_VERSION}}-linux-amd64/unlocker
-                cp LICENSE.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-amd64
-                cp README.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-amd64
-                (cd .bin && tar -czvf ../.out/unlocker-v${{env.BUILD_VERSION}}-linux-amd64.tar.gz unlocker-v${{env.BUILD_VERSION}}-linux-amd64)
+          echo -e "\n###\nBuilding linux/amd64\n"
+          mkdir .bin/unlocker-v${{env.BUILD_VERSION}}-linux-amd64
+          GOOS=linux \
+          GOARCH=amd64 \
+            go build \
+              -ldflags "${BUILD_LDFLAGS}" \
+              -o .bin/unlocker-v${{env.BUILD_VERSION}}-linux-amd64/unlocker
+          cp LICENSE.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-amd64
+          cp README.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-amd64
+          (cd .bin && tar -czvf ../.out/unlocker-v${{env.BUILD_VERSION}}-linux-amd64.tar.gz unlocker-v${{env.BUILD_VERSION}}-linux-amd64)
 
-                echo -e "\n###\nBuilding linux/386\n"
-                mkdir .bin/unlocker-v${{env.BUILD_VERSION}}-linux-386
-                GOOS=linux \
-                GOARCH=386 \
-                  go build \
-                    -ldflags "-X github.com/italypaleale/unlocker/buildinfo.Production=1 -X github.com/italypaleale/unlocker/buildinfo.AppVersion=${{env.BUILD_VERSION}} -X github.com/italypaleale/unlocker/buildinfo.BuildId=${{env.BUILD_ID}} -X github.com/italypaleale/unlocker/buildinfo.BuildDate=${{env.BUILD_DATE}} -X github.com/italypaleale/unlocker/buildinfo.CommitHash=${{env.COMMIT_HASH}}" \
-                    -o .bin/unlocker-v${{env.BUILD_VERSION}}-linux-386/unlocker
-                cp LICENSE.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-386
-                cp README.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-386
-                (cd .bin && tar -czvf ../.out/unlocker-v${{env.BUILD_VERSION}}-linux-386.tar.gz unlocker-v${{env.BUILD_VERSION}}-linux-386)
+          echo -e "\n###\nBuilding linux/386\n"
+          mkdir .bin/unlocker-v${{env.BUILD_VERSION}}-linux-386
+          GOOS=linux \
+          GOARCH=386 \
+            go build \
+              -ldflags "${BUILD_LDFLAGS}" \
+              -o .bin/unlocker-v${{env.BUILD_VERSION}}-linux-386/unlocker
+          cp LICENSE.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-386
+          cp README.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-386
+          (cd .bin && tar -czvf ../.out/unlocker-v${{env.BUILD_VERSION}}-linux-386.tar.gz unlocker-v${{env.BUILD_VERSION}}-linux-386)
 
-                echo -e "\n###\nBuilding linux/arm64\n"
-                mkdir .bin/unlocker-v${{env.BUILD_VERSION}}-linux-arm64
-                GOOS=linux \
-                GOARCH=arm64 \
-                  go build \
-                    -ldflags "-X github.com/italypaleale/unlocker/buildinfo.Production=1 -X github.com/italypaleale/unlocker/buildinfo.AppVersion=${{env.BUILD_VERSION}} -X github.com/italypaleale/unlocker/buildinfo.BuildId=${{env.BUILD_ID}} -X github.com/italypaleale/unlocker/buildinfo.BuildDate=${{env.BUILD_DATE}} -X github.com/italypaleale/unlocker/buildinfo.CommitHash=${{env.COMMIT_HASH}}" \
-                    -o .bin/unlocker-v${{env.BUILD_VERSION}}-linux-arm64/unlocker
-                cp LICENSE.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-arm64
-                cp README.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-arm64
-                (cd .bin && tar -czvf ../.out/unlocker-v${{env.BUILD_VERSION}}-linux-arm64.tar.gz unlocker-v${{env.BUILD_VERSION}}-linux-arm64)
+          echo -e "\n###\nBuilding linux/arm64\n"
+          mkdir .bin/unlocker-v${{env.BUILD_VERSION}}-linux-arm64
+          GOOS=linux \
+          GOARCH=arm64 \
+            go build \
+              -ldflags "${BUILD_LDFLAGS}" \
+              -o .bin/unlocker-v${{env.BUILD_VERSION}}-linux-arm64/unlocker
+          cp LICENSE.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-arm64
+          cp README.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-arm64
+          (cd .bin && tar -czvf ../.out/unlocker-v${{env.BUILD_VERSION}}-linux-arm64.tar.gz unlocker-v${{env.BUILD_VERSION}}-linux-arm64)
 
-                echo -e "\n###\nBuilding linux/armv7\n"
-                mkdir .bin/unlocker-v${{env.BUILD_VERSION}}-linux-armv7
-                GOOS=linux \
-                GOARCH=arm \
-                GOARM=7 \
-                  go build \
-                    -ldflags "-X github.com/italypaleale/unlocker/buildinfo.Production=1 -X github.com/italypaleale/unlocker/buildinfo.AppVersion=${{env.BUILD_VERSION}} -X github.com/italypaleale/unlocker/buildinfo.BuildId=${{env.BUILD_ID}} -X github.com/italypaleale/unlocker/buildinfo.BuildDate=${{env.BUILD_DATE}} -X github.com/italypaleale/unlocker/buildinfo.CommitHash=${{env.COMMIT_HASH}}" \
-                    -o .bin/unlocker-v${{env.BUILD_VERSION}}-linux-armv7/unlocker
-                cp LICENSE.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-armv7
-                cp README.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-armv7
-                (cd .bin && tar -czvf ../.out/unlocker-v${{env.BUILD_VERSION}}-linux-armv7.tar.gz unlocker-v${{env.BUILD_VERSION}}-linux-armv7)
+          echo -e "\n###\nBuilding linux/armv7\n"
+          mkdir .bin/unlocker-v${{env.BUILD_VERSION}}-linux-armv7
+          GOOS=linux \
+          GOARCH=arm \
+          GOARM=7 \
+            go build \
+              -ldflags "${BUILD_LDFLAGS}" \
+              -o .bin/unlocker-v${{env.BUILD_VERSION}}-linux-armv7/unlocker
+          cp LICENSE.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-armv7
+          cp README.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-armv7
+          (cd .bin && tar -czvf ../.out/unlocker-v${{env.BUILD_VERSION}}-linux-armv7.tar.gz unlocker-v${{env.BUILD_VERSION}}-linux-armv7)
 
-                echo -e "\n###\nBuilding darwin/amd64\n"
-                mkdir .bin/unlocker-v${{env.BUILD_VERSION}}-macos
-                GOOS=darwin \
-                GOARCH=amd64 \
-                  go build \
-                    -ldflags "-X github.com/italypaleale/unlocker/buildinfo.Production=1 -X github.com/italypaleale/unlocker/buildinfo.AppVersion=${{env.BUILD_VERSION}} -X github.com/italypaleale/unlocker/buildinfo.BuildId=${{env.BUILD_ID}} -X github.com/italypaleale/unlocker/buildinfo.BuildDate=${{env.BUILD_DATE}} -X github.com/italypaleale/unlocker/buildinfo.CommitHash=${{env.COMMIT_HASH}}" \
-                    -o .bin/unlocker-v${{env.BUILD_VERSION}}-macos-x64/unlocker
-                cp LICENSE.md .bin/unlocker-v${{env.BUILD_VERSION}}-macos-x64
-                cp README.md .bin/unlocker-v${{env.BUILD_VERSION}}-macos-x64
-                (cd .bin && tar -czvf ../.out/unlocker-v${{env.BUILD_VERSION}}-macos-x64.tar.gz unlocker-v${{env.BUILD_VERSION}}-macos-x64)
+          echo -e "\n###\nBuilding darwin/amd64\n"
+          mkdir .bin/unlocker-v${{env.BUILD_VERSION}}-macos
+          GOOS=darwin \
+          GOARCH=amd64 \
+            go build \
+              -ldflags "${BUILD_LDFLAGS}" \
+              -o .bin/unlocker-v${{env.BUILD_VERSION}}-macos-x64/unlocker
+          cp LICENSE.md .bin/unlocker-v${{env.BUILD_VERSION}}-macos-x64
+          cp README.md .bin/unlocker-v${{env.BUILD_VERSION}}-macos-x64
+          (cd .bin && tar -czvf ../.out/unlocker-v${{env.BUILD_VERSION}}-macos-x64.tar.gz unlocker-v${{env.BUILD_VERSION}}-macos-x64)
 
-                echo -e "\n###\nBuilding darwin/arm64\n"
-                mkdir .bin/unlocker-v${{env.BUILD_VERSION}}-macos-arm64
-                GOOS=darwin \
-                GOARCH=arm64 \
-                  go build \
-                    -ldflags "-X github.com/italypaleale/unlocker/buildinfo.Production=1 -X github.com/italypaleale/unlocker/buildinfo.AppVersion=${{env.BUILD_VERSION}} -X github.com/italypaleale/unlocker/buildinfo.BuildId=${{env.BUILD_ID}} -X github.com/italypaleale/unlocker/buildinfo.BuildDate=${{env.BUILD_DATE}} -X github.com/italypaleale/unlocker/buildinfo.CommitHash=${{env.COMMIT_HASH}}" \
-                    -o .bin/unlocker-v${{env.BUILD_VERSION}}-macos-arm64/unlocker
-                cp LICENSE.md .bin/unlocker-v${{env.BUILD_VERSION}}-macos-arm64
-                cp README.md .bin/unlocker-v${{env.BUILD_VERSION}}-macos-arm64
-                (cd .bin && tar -czvf ../.out/unlocker-v${{env.BUILD_VERSION}}-macos-arm64.tar.gz unlocker-v${{env.BUILD_VERSION}}-macos-arm64)
+          echo -e "\n###\nBuilding darwin/arm64\n"
+          mkdir .bin/unlocker-v${{env.BUILD_VERSION}}-macos-arm64
+          GOOS=darwin \
+          GOARCH=arm64 \
+            go build \
+              -ldflags "${BUILD_LDFLAGS}" \
+              -o .bin/unlocker-v${{env.BUILD_VERSION}}-macos-arm64/unlocker
+          cp LICENSE.md .bin/unlocker-v${{env.BUILD_VERSION}}-macos-arm64
+          cp README.md .bin/unlocker-v${{env.BUILD_VERSION}}-macos-arm64
+          (cd .bin && tar -czvf ../.out/unlocker-v${{env.BUILD_VERSION}}-macos-arm64.tar.gz unlocker-v${{env.BUILD_VERSION}}-macos-arm64)
 
-                echo -e "\n###\nLinks for Docker buildx\n"
-                cd .bin
-                ln -v -s unlocker-v${{env.BUILD_VERSION}}-linux-amd64 linux-amd64 
-                ln -v -s unlocker-v${{env.BUILD_VERSION}}-linux-arm64 linux-arm64 
-                ln -v -s unlocker-v${{env.BUILD_VERSION}}-linux-armv7 linux-arm
-                cd ..
-                '
+          echo -e "\n###\nLinks for Docker buildx\n"
+          (
+            cd .bin && \
+            ln -v -s unlocker-v${{env.BUILD_VERSION}}-linux-amd64 linux-amd64 && \
+            ln -v -s unlocker-v${{env.BUILD_VERSION}}-linux-arm64 linux-arm64 && \
+            ln -v -s unlocker-v${{env.BUILD_VERSION}}-linux-armv7 linux-arm \
+          )
+
           echo -e "\n###\nCompilation done\n"
           ls -al .bin
           ls -al .out
