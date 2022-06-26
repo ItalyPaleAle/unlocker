@@ -113,9 +113,6 @@ func (a *AppLogger) LoggerMiddleware(c *gin.Context) {
 
 	// Check if we have a message
 	msg := c.GetString("log-message")
-	if msg == "" {
-		msg = "Request"
-	}
 
 	// Check if we want to mask something in the URL
 	mask, ok := c.Get("log-mask")
