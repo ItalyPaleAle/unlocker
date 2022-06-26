@@ -1,4 +1,8 @@
 # Creates a release for the application
+#
+# Required secrets:
+# - DOCKERHUB_TOKEN: Token for publishing to Docker Hub (optional)
+
 name: Release
 
 on:
@@ -10,6 +14,8 @@ on:
 env:
   GO_VERSION: "^1.18"
   CGO_ENABLED: "0"
+  # Username for Docker Hub-set to empty to disable pushing to Docker Hub
+  DOCKERHUB_USERNAME: "italypaleale"
 
 jobs:
 
@@ -61,8 +67,9 @@ jobs:
 
       - name: Login to DockerHub
         uses: docker/login-action@v1
+        if: env.DOCKERHUB_USERNAME != ''
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Login to GitHub Container Registry
@@ -78,13 +85,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v1
 
-      - name: Set variable REPO_OWNER
-        shell: bash
-        run: |
-          # We need to lowercase the value of REPO_OWNER
-          REPO_OWNER=${{ github.repository_owner }}
-          echo "REPO_OWNER=${REPO_OWNER,,}" >>${GITHUB_ENV}
-
       - name: Build for all platforms
         run: |
           mkdir -p .bin .out
@@ -95,6 +95,7 @@ jobs:
           echo -e "\n###\nSetting BUILD_LDFLAGS\n"
           BUILDINFO_PKG="github.com/${{ github.repository_owner }}/unlocker/buildinfo"
           BUILD_LDFLAGS="-X ${BUILDINFO_PKG}.Production=1 -X ${BUILDINFO_PKG}.AppVersion=${{env.BUILD_VERSION}} -X ${BUILDINFO_PKG}.BuildId=${{env.BUILD_ID}} -X ${BUILDINFO_PKG}.BuildDate=${{env.BUILD_DATE}} -X ${BUILDINFO_PKG}.CommitHash=${{env.COMMIT_HASH}}"
+          echo "BUILD_LDFLAGS=${BUILD_LDFLAGS}"
 
           echo -e "\n###\nBuilding linux/amd64\n"
           mkdir .bin/unlocker-v${{env.BUILD_VERSION}}-linux-amd64
@@ -254,16 +255,32 @@ jobs:
           asset_name: unlocker-v${{env.BUILD_VERSION}}-macos-arm64.tar.gz
           asset_content_type: application/gzip
 
-      - name: Docker build and push
-        id: docker_build
+      - name: Set variable REPO_OWNER
+        shell: bash
+        run: |
+          # We need to lowercase the value of REPO_OWNER
+          REPO_OWNER=${{ github.repository_owner }}
+          echo "REPO_OWNER=${REPO_OWNER,,}" >>${GITHUB_ENV}
+
+      - name: Docker build and push to GHCR
         uses: docker/build-push-action@v2
         with:
           context: .
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/unlocker:${{env.BUILD_VERSION}}
-            ${{ secrets.DOCKERHUB_USERNAME }}/unlocker:${{env.BRANCH}}
             ghcr.io/${{ env.REPO_OWNER }}/unlocker:${{env.BUILD_VERSION}}
             ghcr.io/${{ env.REPO_OWNER }}/unlocker:${{env.BRANCH}}
+          push: true
+
+      - name: Docker build and push to Docker Hub
+        uses: docker/build-push-action@v2
+        if: env.DOCKERHUB_USERNAME != ''
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          tags: |
+            ${{ env.DOCKERHUB_USERNAME }}/unlocker:${{env.BUILD_VERSION}}
+            ${{ env.DOCKERHUB_USERNAME }}/unlocker:${{env.BRANCH}}
           push: true
