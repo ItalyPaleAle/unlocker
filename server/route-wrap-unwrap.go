@@ -62,6 +62,7 @@ func (s *Server) RouteWrapUnwrap(op requestOperation) gin.HandlerFunc {
 		stateId := stateUuid.String()
 		now := time.Now()
 		ip := c.ClientIP()
+		validity := time.Duration(req.Timeout) * time.Second
 		s.states[stateId] = &requestState{
 			Operation:  op,
 			Input:      val,
@@ -70,7 +71,7 @@ func (s *Server) RouteWrapUnwrap(op requestOperation) gin.HandlerFunc {
 			KeyVersion: req.KeyVersion,
 			Requestor:  ip,
 			Date:       now,
-			Expiry:     now.Add(time.Duration(req.Timeout) * time.Second),
+			Expiry:     now.Add(validity),
 		}
 
 		// Invoke the webhook and send a message with the URL to unlock
@@ -90,6 +91,9 @@ func (s *Server) RouteWrapUnwrap(op requestOperation) gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusInternalServerError, ErrorResponse("Error sending webhook"))
 			return
 		}
+
+		// Make the request expire in background
+		go s.expireRequest(stateId, validity)
 
 		// Respond with the state ID
 		c.JSON(http.StatusAccepted, operationResponse{

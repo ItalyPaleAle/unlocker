@@ -26,9 +26,6 @@ import (
 //go:embed confirm-page.html
 var confirmPage string
 
-// Interval to run garbage collection to remove expired requests
-const cleanupInterval = 30 * time.Second
-
 // Server is the server based on Gin
 type Server struct {
 	ctx        context.Context
@@ -125,9 +122,6 @@ func (s *Server) Init(log *utils.AppLogger) error {
 	s.router.GET("/auth", s.RouteAuth)
 	s.router.GET("/confirm", codeFilterLogMw, s.RouteConfirmGet)
 	s.router.POST("/confirm", s.RouteConfirmPost)
-
-	// Start the background worker that cleans up all states
-	s.statesCleanup()
 
 	return nil
 }
@@ -240,33 +234,38 @@ func (s *Server) notifySubscriber(stateId string, state *requestState) {
 	delete(s.subs, stateId)
 }
 
-// Starts a goroutine that periodically removes expired states
-func (s *Server) statesCleanup() {
-	go func() {
-		ticker := time.NewTicker(cleanupInterval)
-		for range ticker.C {
-			// Iterate through states and look for expired ones
-			s.lock.Lock()
-			for k, v := range s.states {
-				if v.Expired() {
-					s.log.Raw().Info().Msg("Removed expired operation " + k)
-					delete(s.states, k)
-				}
-			}
-			// Iterate through subscriptions to find those that are for expired states
-			for k, v := range s.subs {
-				_, ok := s.states[k]
-				if ok {
-					continue
-				}
-				if v != nil {
-					close(v)
-				}
-				delete(s.subs, k)
-			}
-			s.lock.Unlock()
+// This method makes a pending request expire after the given time interval
+// It should be invoked in a background goroutine
+func (s *Server) expireRequest(stateId string, validity time.Duration) {
+	// Wait until the request is expired
+	time.Sleep(validity)
+
+	// Acquire a lock to ensure consistency
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	// Check if the request still exists
+	req, ok := s.states[stateId]
+	if !ok || req == nil {
+		return
+	}
+	s.log.Raw().Info().Msg("Removing expired operation " + stateId)
+
+	// Set the request as canceled
+	req.Status = StatusCanceled
+
+	// If there's a subscription, send a notification
+	ch, ok := s.subs[stateId]
+	if ok {
+		if ch != nil {
+			ch <- req
+			close(ch)
 		}
-	}()
+		delete(s.subs, stateId)
+	}
+
+	// Delete the state object
+	delete(s.states, stateId)
 }
 
 // Loads the TLS certificate specified in the config file
