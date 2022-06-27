@@ -7,12 +7,12 @@ import (
 )
 
 // DecodeBase64String is a flexible base64 decoder that supports both standard and url encodings, and considers padding optional
-func DecodeBase64String(in string) ([]byte, error) {
+func DecodeBase64String(in string) (out []byte, err error) {
 	// First, remove padding if any
 	in = strings.TrimRight(in, "=")
 
 	// Try decoding using URL encoding
-	out, err := base64.RawURLEncoding.DecodeString(in)
+	out, err = base64.RawURLEncoding.DecodeString(in)
 	if err == nil {
 		return out, nil
 	}
