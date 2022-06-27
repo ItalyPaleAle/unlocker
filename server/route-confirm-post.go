@@ -34,13 +34,21 @@ func (s *Server) RouteConfirmPost(c *gin.Context) {
 		s.lock.Unlock()
 		return
 	}
+	if state.Expired() {
+		_ = c.Error(errors.New("State object is expired"))
+		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("State not found or expired"))
+		s.lock.Unlock()
+		return
+	}
 	if state.Status != StatusPending {
+		_ = c.Error(errors.New("Request already completed"))
 		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Request already completed"))
 		s.lock.Unlock()
 		return
 	}
 	if state.Processing {
-		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Request is already being processed"))
+		_ = c.Error(errors.New("Request is already being processed"))
+		c.AbortWithStatusJSON(http.StatusConflict, ErrorResponse("Request is already being processed"))
 		s.lock.Unlock()
 		return
 	}
@@ -95,6 +103,13 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestSta
 	if err != nil {
 		_ = c.Error(err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, InternalServerError)
+		return
+	}
+
+	// Ensure the request hasn't expired in the meanwhile
+	if state.Expired() {
+		_ = c.Error(errors.New("State object is expired after receiving response from Key Vault"))
+		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("State not found or expired"))
 		return
 	}
 

@@ -49,7 +49,13 @@ func (s *Server) RouteConfirmGet(c *gin.Context) {
 		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("State not found or expired"))
 		return
 	}
+	if state.Expired() {
+		_ = c.Error(errors.New("State object is expired"))
+		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("State not found or expired"))
+		return
+	}
 	if state.Status != StatusPending {
+		_ = c.Error(errors.New("Request already completed"))
 		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Request already completed"))
 		return
 	}

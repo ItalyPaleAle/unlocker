@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"crypto/tls"
-	"encoding/json"
 	"fmt"
 	"html/template"
 	"net/http"
@@ -134,7 +133,7 @@ func (s *Server) Init(log *utils.AppLogger) error {
 }
 
 // Start the web server
-// Note this function is blocking, and will return only when the servers are shut down (via context cancelation or via SIGINT/SIGTERM signals)
+// Note this function is blocking, and will return only when the servers are shut down (via context cancellation or via SIGINT/SIGTERM signals)
 func (s *Server) Start(ctx context.Context) error {
 	s.ctx = ctx
 
@@ -248,9 +247,8 @@ func (s *Server) statesCleanup() {
 		for range ticker.C {
 			// Iterate through states and look for expired ones
 			s.lock.Lock()
-			now := time.Now()
 			for k, v := range s.states {
-				if v.Expiry.Before(now) {
+				if v.Expired() {
 					s.log.Raw().Info().Msg("Removed expired operation " + k)
 					delete(s.states, k)
 				}
@@ -288,47 +286,6 @@ func (s *Server) loadTLSCert() ([]tls.Certificate, error) {
 		return nil, err
 	}
 	return []tls.Certificate{obj}, nil
-}
-
-// ErrorResponse is used to send JSON responses with an error
-type ErrorResponse string
-
-// MarshalJSON implements a JSON marshaller that returns an object with the error key
-func (e ErrorResponse) MarshalJSON() ([]byte, error) {
-	return json.Marshal(map[string]string{"error": string(e)})
-}
-
-// InternalServerError is an ErrorResponse for Internal Server Error messages
-const InternalServerError ErrorResponse = "An internal error occurred"
-
-type requestOperation uint8
-
-const (
-	OperationWrap requestOperation = iota
-	OperationUnwrap
-)
-
-type requestStatus uint8
-
-const (
-	StatusPending requestStatus = iota
-	StatusComplete
-	StatusCanceled
-)
-
-type requestState struct {
-	Status     requestStatus
-	Operation  requestOperation
-	Processing bool
-	Input      []byte
-	Output     []byte
-	Vault      string
-	KeyId      string
-	KeyVersion string
-	Requestor  string
-	Date       time.Time
-	Expiry     time.Time
-	Token      *AccessToken
 }
 
 type operationResponse struct {
