@@ -111,7 +111,7 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestSta
 	defer s.lock.Unlock()
 
 	// Ensure the request hasn't expired in the meanwhile
-	if state.Expired() {
+	if state.Expired() || state.Status != StatusPending {
 		_ = c.Error(errors.New("State object is expired after receiving response from Key Vault"))
 		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("State not found or expired"))
 		return
