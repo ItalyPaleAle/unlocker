@@ -49,3 +49,11 @@ baseUrl: "https://localhost:8080"
 # Default timeout for wrap and unwrap requests, in seconds
 # Can be overridden in each request
 requestTimeout: 300
+
+# String used as key to sign state tokens
+# If left empty (recommended), it will be randomly generated every time the app starts 
+tokenSigningKey: ""
+
+# String used as key to encrypt cookies
+# If left empty (recommended), it will be randomly generated every time the app starts 
+cookieEncryptionKey: ""

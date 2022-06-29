@@ -31,7 +31,6 @@ type requestState struct {
 	Requestor  string
 	Date       time.Time
 	Expiry     time.Time
-	Token      *AccessToken
 }
 
 // Expired returns true if the request has expired

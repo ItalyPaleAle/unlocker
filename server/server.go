@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"html/template"
 	"net/http"
 	"os"
 	"os/signal"
@@ -14,8 +13,6 @@ import (
 	"syscall"
 	"time"
 
-	_ "embed"
-
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
@@ -23,8 +20,16 @@ import (
 	"github.com/italypaleale/unlocker/utils"
 )
 
-//go:embed confirm-page.html
-var confirmPage string
+const (
+	// Name of the CSRF cookie
+	csrfCookieName = "_csrf_state"
+	// Max Age for the CSRF cookie
+	csrfCookieMaxAge = 5 * time.Minute
+	// Name of the Access Token cookie
+	atCookieName = "_at"
+	// Max Age for the Access Token cookie
+	atCookieMaxAge = 5 * time.Minute
+)
 
 // Server is the server based on Gin
 type Server struct {
@@ -102,13 +107,6 @@ func (s *Server) Init(log *utils.AppLogger) error {
 	// Logger middleware that removes the auth code from the URL
 	codeFilterLogMw := s.log.LoggerMaskMiddleware(regexp.MustCompile(`(\?|&)(code=)([^&]*)`), "$1$2***")
 
-	// HTML template for the confirmation page
-	confirmPageTpl, err := template.New("confirm-page").Parse(confirmPage)
-	if err != nil {
-		return err
-	}
-	s.router.SetHTMLTemplate(confirmPageTpl)
-
 	// Middleware to allow certain IPs
 	allowIpMw, err := s.AllowIpMiddleware()
 	if err != nil {
@@ -120,8 +118,12 @@ func (s *Server) Init(log *utils.AppLogger) error {
 	s.router.POST("/unwrap", allowIpMw, s.RouteWrapUnwrap(OperationUnwrap))
 	s.router.GET("/result/:state", allowIpMw, s.RouteResult)
 	s.router.GET("/auth", s.RouteAuth)
-	s.router.GET("/confirm", codeFilterLogMw, s.RouteConfirmGet)
-	s.router.POST("/confirm", s.RouteConfirmPost)
+	s.router.GET("/auth/confirm", codeFilterLogMw, s.RouteAuthConfirm)
+	s.router.GET("/api/list", s.AccessTokenMiddleware(true), s.RouteApiListGet)
+	s.router.POST("/api/confirm", s.AccessTokenMiddleware(true), s.RouteApiConfirmPost)
+
+	// Static files as fallback
+	s.router.NoRoute(s.serveClient)
 
 	return nil
 }

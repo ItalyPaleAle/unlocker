@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
 	"errors"
+	"io"
 	"os"
 	"path/filepath"
 
@@ -110,4 +113,34 @@ func loadConfig() {
 		viper.Set("tlsCert", filepath.Join(dir, "tls-cert.pem"))
 		viper.Set("tlsKey", filepath.Join(dir, "tls-key.pem"))
 	}
+
+	// Generate random tokenSigningKey if needed
+	if viper.GetString("tokenSigningKey") == "" {
+		tokenSigningKey, err := utils.RandomString()
+		if err != nil {
+			appLogger.Raw().Fatal().
+				AnErr("error", err).
+				Msg("Failed to generate random tokenSigningKey")
+		}
+
+		viper.Set("tokenSigningKey", tokenSigningKey)
+	}
+
+	// If we have cookieEncryptionKey set, derive a 128-bit key from that
+	// Otherwise, generate a random 128-bit key
+	var cek []byte
+	cekStr := viper.GetString("cookieEncryptionKey")
+	if cekStr != "" {
+		h := sha256.Sum256([]byte(cekStr))
+		cek = h[:]
+	} else {
+		_, err := io.ReadFull(rand.Reader, cek)
+		if err != nil {
+			appLogger.Raw().Fatal().
+				AnErr("error", err).
+				Msg("Failed to generate random cookieEncryptionKey")
+		}
+
+	}
+	viper.Set("cookieEncryptionKey", cek)
 }

@@ -1,6 +1,9 @@
 package utils
 
 import (
+	"crypto/rand"
+	"encoding/base64"
+	"io"
 	"strings"
 )
 
@@ -13,4 +16,15 @@ func IsTruthy(str string) bool {
 		str == "on" ||
 		str == "yes" ||
 		str == "y"
+}
+
+// RandomString generates a random string of 20 base64url-encoded characters
+func RandomString() (string, error) {
+	buf := make([]byte, 15)
+	_, err := io.ReadFull(rand.Reader, buf)
+	if err != nil {
+		return "", err
+	}
+
+	return base64.RawURLEncoding.EncodeToString(buf), nil
 }

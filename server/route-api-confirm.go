@@ -9,9 +9,9 @@ import (
 	"github.com/italypaleale/unlocker/keyvault"
 )
 
-// RouteConfirmPost is the handler for the POST /confirm request
+// RouteApiConfirmPost is the handler for the POST /api/confirm request
 // This receives the results of the confirm/reject action
-func (s *Server) RouteConfirmPost(c *gin.Context) {
+func (s *Server) RouteApiConfirmPost(c *gin.Context) {
 	// Get the fields from the body
 	req := &confirmRequest{}
 	err := c.Bind(req)
@@ -72,9 +72,18 @@ func (s *Server) RouteConfirmPost(c *gin.Context) {
 
 // Handle confirmation of operations
 func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestState) {
+	var at string
+	atAny, ok := c.Get("accessToken")
+	if ok {
+		at, ok = atAny.(string)
+		if !ok {
+			at = ""
+		}
+	}
+
 	// Init the Key Vault client
 	akv := keyvault.Client{}
-	err := akv.Init(state.Token.AccessToken)
+	err := akv.Init(at)
 	if err != nil {
 		_ = c.Error(err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, InternalServerError)
