@@ -18,9 +18,17 @@ export class ResponseNotOkError extends Error {
 }
 
 /**
+ * Response object
+ */
+export type Response<T> = {
+    data: T
+    ttl?: number
+}
+
+/**
  * Performs API requests.
  */
-export async function Request<T>(url: string, options?: RequestOptions): Promise<T> {
+export async function Request<T>(url: string, options?: RequestOptions): Promise<Response<T>> {
     if (!options) {
         options = {}
     }
@@ -105,7 +113,21 @@ export async function Request<T>(url: string, options?: RequestOptions): Promise
             throw e
         }
 
-        return body
+        // Get the TTL
+        let ttl: number|undefined = undefined
+        const ttlHeader = response.headers.get('x-session-ttl')
+        if (ttlHeader) {
+            ttl = parseInt(ttlHeader, 10)
+            if (ttl < 1) {
+                ttl = 0
+            }
+        }
+
+        // Response
+        return {
+            data: body,
+            ttl
+        }
     }
     catch (err) {
         if (err instanceof TimeoutError) {

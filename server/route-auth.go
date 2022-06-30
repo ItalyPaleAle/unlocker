@@ -135,30 +135,6 @@ func (s *Server) RouteAuthConfirm(c *gin.Context) {
 	c.Redirect(http.StatusTemporaryRedirect, viper.GetString("baseUrl"))
 }
 
-type routeAuthSessionResponse struct {
-	// TTL in seconds
-	TTL int `json:"ttl"`
-}
-
-// RouteAuthSession is the handler for the GET /auth/session request
-// This checks if the user is authenticated (through the AccessTokenMiddleware middleware) and responds with the lifetime of the session
-func (s *Server) RouteAuthSession(c *gin.Context) {
-	var ttl time.Duration
-	ttlAny, ok := c.Get(contextKeySessionTTL)
-	if ok {
-		ttl, ok = ttlAny.(time.Duration)
-		if !ok {
-			ttl = 0
-		}
-	}
-
-	// If we are here, the session is valid
-	// AccessTokenMiddleware already responded with a 401 error to unauthorized requests
-	c.JSON(http.StatusOK, routeAuthSessionResponse{
-		TTL: int(ttl.Seconds()),
-	})
-}
-
 func (s *Server) requestAccessToken(ctx context.Context, code string) (*AccessToken, error) {
 	// Build the request
 	data := url.Values{

@@ -108,7 +108,6 @@ func (s *Server) Init(log *utils.AppLogger) error {
 	s.router.GET("/result/:state", allowIpMw, s.RouteResult)
 	s.router.GET("/auth", s.RouteAuth)
 	s.router.GET("/auth/confirm", codeFilterLogMw, s.RouteAuthConfirm)
-	s.router.GET("/auth/session", s.AccessTokenMiddleware(true), s.RouteAuthSession)
 	s.router.GET("/api/list", s.AccessTokenMiddleware(true), s.RouteApiListGet)
 	s.router.POST("/api/confirm", s.AccessTokenMiddleware(true), s.RouteApiConfirmPost)
 

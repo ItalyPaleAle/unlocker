@@ -3,10 +3,12 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
 
+const headerSessionTTL = "x-session-ttl"
 const contextKeySessionAccessToken = "sessionAccessToken"
 const contextKeySessionTTL = "sessionTTL"
 
@@ -27,6 +29,10 @@ func (s *Server) AccessTokenMiddleware(required bool) func(c *gin.Context) {
 			return
 		}
 
+		// Set the TTL in the header
+		c.Header(headerSessionTTL, strconv.Itoa(int(ttl.Seconds())))
+
+		// Set the values in the context
 		c.Set(contextKeySessionAccessToken, at)
 		c.Set(contextKeySessionTTL, ttl)
 	}
