@@ -102,7 +102,7 @@ module.exports = {
         ],
         'brace-style': [
             'error',
-            'stroustrup',
+            '1tbs',
             {
                 allowSingleLine: false
             }
@@ -186,6 +186,9 @@ module.exports = {
             'warn'
         ],
         'no-nested-ternary': [
+            'error'
+        ],
+        'no-trailing-spaces': [
             'error'
         ],
         'no-unneeded-ternary': [

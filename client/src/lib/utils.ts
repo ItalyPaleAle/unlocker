@@ -4,7 +4,7 @@
  * @param time Time to wait in ms; if 0, this just executes the action on the next tick of the event loop
  * @returns Promise that resolves after a certain amount of time
  */
- export function waitPromise(time: number): Promise<void> {
+export function waitPromise(time: number): Promise<void> {
     return new Promise((resolve) => {
         setTimeout(resolve, time || 0)
     })

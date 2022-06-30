@@ -12,10 +12,11 @@
         "noImplicitAny": true,
         "noImplicitReturns": true,
         "outDir": "dist",
-        "types": ["svelte"]
+        "types": ["svelte"],
     },
     "include": [
-        "src/**/*"
+        "src/**/*",
+        "src/*"
     ],
     "exclude": [
         "node_modules/*",

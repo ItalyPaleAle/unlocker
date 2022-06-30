@@ -26,6 +26,12 @@ export type Response<T> = {
 }
 
 /**
+ * URL prefix
+ * Used to export the URL_PREFIX constant since globals do not work well with the Svelte language server.
+ */
+export const URLPrefix = URL_PREFIX || ''
+
+/**
  * Performs API requests.
  */
 export async function Request<T>(url: string, options?: RequestOptions): Promise<Response<T>> {
@@ -34,9 +40,7 @@ export async function Request<T>(url: string, options?: RequestOptions): Promise
     }
 
     // URL prefix
-    if (URL_PREFIX) {
-        url = URL_PREFIX + url
-    }
+    url = URLPrefix + url
 
     // Set the options
     const reqOptions: RequestInit = {
@@ -128,8 +132,7 @@ export async function Request<T>(url: string, options?: RequestOptions): Promise
             data: body,
             ttl
         }
-    }
-    catch (err) {
+    } catch (err) {
         if (err instanceof TimeoutError) {
             controller.abort()
             throw Error('Request has timed out')

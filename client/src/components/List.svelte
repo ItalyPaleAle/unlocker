@@ -1,20 +1,28 @@
-{#await pendingRequest}
-    <p>Loading…</p>
-{:then list}
-    <p>Loaded</p>
-    <pre>{JSON.stringify(list, null, '  ')}</pre>
-{:catch err}
-    <p>Error while trying to connect with the </p>
-{/await}
+{#if pendingRequest}
+    {#await pendingRequest}
+        <p>Loading…</p>
+    {:then list}
+        <p>Loaded</p>
+        <pre>{JSON.stringify(list, null, '  ')}</pre>
+        {#each list as item (item.state)}
+            <PendingItem {item} />
+        {/each}
+    {:catch err}
+        <p>Error while requesting the list of pending items: {err}</p>
+    {/await}
+{/if}
 
 <script lang="ts">
-import {Request, ResponseNotOkError} from '../lib/request'
+import PendingItem from './PendingItem.svelte'
+
+import {Request, ResponseNotOkError, URLPrefix, type Response as RequestResponse} from '../lib/request'
+import type {pendingRequestItem, apiListResponse} from '../lib/types'
 
 import {createEventDispatcher, onDestroy, onMount} from 'svelte'
 
 const dispatch = createEventDispatcher()
 
-let pendingRequest: Promise<pendingRequestItem[]>
+let pendingRequest: Promise<pendingRequestItem[]>|null = null
 let refreshInterval = 0
 let redirectTimeout = 0
 
@@ -22,52 +30,23 @@ onMount(() => {
     // Request the list of pending items
     pendingRequest = ListPending()
 
-    // Refresh in background every 10 seconds
+    // Refresh in background every 5 seconds
     void pendingRequest.then(() => {
-        refreshInterval = setInterval(ListPending, 10_000)
+        refreshInterval = setInterval(() => {
+            pendingRequest = ListPending()
+        }, 5_000)
     })
 })
 
 onDestroy(ClearRefreshInterval)
 
-type pendingRequestItem = {
-    state: string
-    operation: string
-    keyId: string
-    vaultName: string
-    requestor: string
-    date: string
-    expiry: string
-}
-
-type apiListResponse = {
-    pending: pendingRequestItem[]
-}
-
 async function ListPending(): Promise<pendingRequestItem[]> {
     // Once the app loads, check if we can connect to the server and have a valid session
+    let res: RequestResponse<apiListResponse>
     try {
         // Request the list
-        const res = await Request<apiListResponse>('/api/list')
-
-        // Check if the session has expired
-        if (!res?.ttl || res.ttl < 1) {
-            RedirectToAuth()
-            return []
-        }
-
-        // When the session has expired, send a notification to the App
-        if (redirectTimeout) {
-            clearTimeout(redirectTimeout)
-        }
-        redirectTimeout = setTimeout(() => {
-            ClearRefreshInterval()
-            dispatch('sessionExpired', true)
-        }, res.ttl * 1000)
-
-        return res.data?.pending || []
-    }
-    catch (e) {
+        res = await Request<apiListResponse>('/api/list')
+    } catch (e) {
         // If the error is that we got a 401 response, redirect to the auth page
         if (e instanceof ResponseNotOkError && e.statusCode == 401) {
             RedirectToAuth()
@@ -76,7 +55,27 @@ async function ListPending(): Promise<pendingRequestItem[]> {
         throw e
     }
 
-    return []
+    // Check if the session has expired
+    if (!res?.ttl || res.ttl < 1) {
+        RedirectToAuth()
+        return []
+    }
+
+    // When the session has expired, send a notification to the App
+    if (redirectTimeout) {
+        clearTimeout(redirectTimeout)
+    }
+    redirectTimeout = setTimeout(() => {
+        ClearRefreshInterval()
+        dispatch('sessionExpired', true)
+    }, res.ttl * 1000)
+
+    if (!res.data?.pending?.length) {
+        return []
+    }
+
+    // Filter empty values
+    return res.data.pending.filter((v) => v && v.state)
 }
 
 function ClearRefreshInterval() {
@@ -84,6 +83,6 @@ function ClearRefreshInterval() {
 }
 
 function RedirectToAuth() {
-    window.location.href = URL_PREFIX + '/auth'
+    window.location.href = URLPrefix + '/auth'
 }
 </script>
