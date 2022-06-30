@@ -2,7 +2,6 @@ package server
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -12,13 +11,13 @@ type apiListResponse struct {
 }
 
 type pendingRequestItem struct {
-	State     string    `json:"state"`
-	Operation string    `json:"operation"`
-	KeyId     string    `json:"keyId"`
-	VaultName string    `json:"vaultName"`
-	Requestor string    `json:"requestor"`
-	Date      time.Time `json:"date"`
-	Expiry    time.Time `json:"expiry"`
+	State     string `json:"state"`
+	Operation string `json:"operation"`
+	KeyId     string `json:"keyId"`
+	VaultName string `json:"vaultName"`
+	Requestor string `json:"requestor"`
+	Date      int64  `json:"date"`
+	Expiry    int64  `json:"expiry"`
 }
 
 // RouteApiListGet is the handler for the GET /api/list request
@@ -45,8 +44,8 @@ func (s *Server) RouteApiListGet(c *gin.Context) {
 				KeyId:     state.KeyId,
 				VaultName: state.Vault,
 				Requestor: state.Requestor,
-				Date:      state.Date,
-				Expiry:    state.Expiry,
+				Date:      state.Date.Unix(),
+				Expiry:    state.Expiry.Unix(),
 			}
 			i++
 		}

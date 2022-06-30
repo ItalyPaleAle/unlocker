@@ -133,8 +133,8 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestSta
 	state.Status = StatusComplete
 
 	// Response
-	c.Set("log-message", "Done: "+stateId)
-	c.JSON(http.StatusOK, map[string]bool{"done": true})
+	c.Set("log-message", "Operation confirmed: "+stateId)
+	c.JSON(http.StatusOK, map[string]bool{"confirmed": true})
 
 	// Send a notification to the subscriber if any
 	s.notifySubscriber(stateId, state)
