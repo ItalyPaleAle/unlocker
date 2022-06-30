@@ -1,6 +1,6 @@
 {#if sessionExpired}
     <p>Your session has expired.</p>
-    <button on:click={RedirectToAuth}>Sign in again</button>
+    <button on:click={() => window.location.reload()}>Reload</button>
 {:else}
     {#await loadSession}
         <p>Loading…</p>
