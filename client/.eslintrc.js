@@ -1,27 +1,53 @@
 /* eslint-disable quote-props */
 
+const tsParserOptions = {
+    tsconfigRootDir: __dirname,
+    project: ['./tsconfig.json']
+}
+
+const tsExtends = [
+    'plugin:@typescript-eslint/recommended',
+    'plugin:@typescript-eslint/recommended-requiring-type-checking'
+]
+
 module.exports = {
+    root: true,
     env: {
         es2019: true,
         node: true,
         browser: true
     },
-    extends: 'eslint:recommended',
+    extends: [
+        'eslint:recommended',
+    ],
+    parser: '@typescript-eslint/parser',
     parserOptions: {
         ecmaVersion: 2019,
-        sourceType: 'module'
+        sourceType: 'module',
     },
     plugins: [
         'html',
-        'svelte3'
+        'svelte3',
+        '@typescript-eslint'
     ],
     overrides: [
         {
             files: ['*.svelte'],
-            processor: 'svelte3/svelte3'
+            processor: 'svelte3/svelte3',
+            extends: tsExtends,
+            parserOptions: {
+                ...tsParserOptions,
+                extraFileExtensions: ['.svelte']
+            }
+        },
+        {
+            files: ['*.ts'],
+            extends: tsExtends,
+            parserOptions: tsParserOptions
         }
     ],
     settings: {
+        'svelte3/typescript': require('typescript'),
         'svelte3/ignore-styles': () => true,
         'html': {
             'indent': 0,
@@ -48,7 +74,11 @@ module.exports = {
         ],
         'quotes': [
             'error',
-            'single'
+            'single',
+            {
+                avoidEscape: true,
+                allowTemplateLiterals: true
+            }
         ],
         'semi': [
             'error',

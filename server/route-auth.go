@@ -10,12 +10,24 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
 	"golang.org/x/text/unicode/norm"
 
 	"github.com/italypaleale/unlocker/utils"
+)
+
+const (
+	// Name of the CSRF cookie
+	csrfCookieName = "_csrf_state"
+	// Max Age for the CSRF cookie
+	csrfCookieMaxAge = 5 * time.Minute
+	// Name of the Access Token cookie
+	atCookieName = "_at"
+	// Max Age for the Access Token cookie
+	atCookieMaxAge = 5 * time.Minute
 )
 
 // AccessToken contains the details of the access token
@@ -111,10 +123,40 @@ func (s *Server) RouteAuthConfirm(c *gin.Context) {
 	}
 
 	// Set the access token in a cookie
-	setSecureCookie(c, atCookieName, accessToken.AccessToken, int(atCookieMaxAge.Seconds()), "/", c.Request.URL.Host, secureCookie, true)
+	maxAge := int(atCookieMaxAge.Seconds())
+	err = setSecureCookie(c, atCookieName, accessToken.AccessToken, maxAge, "/", c.Request.URL.Host, secureCookie, true)
+	if err != nil {
+		_ = c.Error(err)
+		c.AbortWithStatusJSON(http.StatusInternalServerError, InternalServerError)
+		return
+	}
 
 	// Redirect the user to the main page
 	c.Redirect(http.StatusTemporaryRedirect, viper.GetString("baseUrl"))
+}
+
+type routeAuthSessionResponse struct {
+	// TTL in seconds
+	TTL int `json:"ttl"`
+}
+
+// RouteAuthSession is the handler for the GET /auth/session request
+// This checks if the user is authenticated (through the AccessTokenMiddleware middleware) and responds with the lifetime of the session
+func (s *Server) RouteAuthSession(c *gin.Context) {
+	var ttl time.Duration
+	ttlAny, ok := c.Get(contextKeySessionTTL)
+	if ok {
+		ttl, ok = ttlAny.(time.Duration)
+		if !ok {
+			ttl = 0
+		}
+	}
+
+	// If we are here, the session is valid
+	// AccessTokenMiddleware already responded with a 401 error to unauthorized requests
+	c.JSON(http.StatusOK, routeAuthSessionResponse{
+		TTL: int(ttl.Seconds()),
+	})
 }
 
 func (s *Server) requestAccessToken(ctx context.Context, code string) (*AccessToken, error) {

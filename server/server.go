@@ -20,17 +20,6 @@ import (
 	"github.com/italypaleale/unlocker/utils"
 )
 
-const (
-	// Name of the CSRF cookie
-	csrfCookieName = "_csrf_state"
-	// Max Age for the CSRF cookie
-	csrfCookieMaxAge = 5 * time.Minute
-	// Name of the Access Token cookie
-	atCookieName = "_at"
-	// Max Age for the Access Token cookie
-	atCookieMaxAge = 5 * time.Minute
-)
-
 // Server is the server based on Gin
 type Server struct {
 	ctx        context.Context
@@ -119,11 +108,12 @@ func (s *Server) Init(log *utils.AppLogger) error {
 	s.router.GET("/result/:state", allowIpMw, s.RouteResult)
 	s.router.GET("/auth", s.RouteAuth)
 	s.router.GET("/auth/confirm", codeFilterLogMw, s.RouteAuthConfirm)
+	s.router.GET("/auth/session", s.AccessTokenMiddleware(true), s.RouteAuthSession)
 	s.router.GET("/api/list", s.AccessTokenMiddleware(true), s.RouteApiListGet)
 	s.router.POST("/api/confirm", s.AccessTokenMiddleware(true), s.RouteApiConfirmPost)
 
 	// Static files as fallback
-	s.router.NoRoute(s.serveClient)
+	s.router.NoRoute(s.serveClient())
 
 	return nil
 }

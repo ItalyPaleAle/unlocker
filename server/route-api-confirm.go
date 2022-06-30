@@ -72,8 +72,9 @@ func (s *Server) RouteApiConfirmPost(c *gin.Context) {
 
 // Handle confirmation of operations
 func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestState) {
+	// Errors here should never happen
 	var at string
-	atAny, ok := c.Get("accessToken")
+	atAny, ok := c.Get(contextKeySessionAccessToken)
 	if ok {
 		at, ok = atAny.(string)
 		if !ok {

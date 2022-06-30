@@ -86,7 +86,7 @@ module.exports = {
         // Definitions
         new webpack.DefinePlugin({
             PRODUCTION: prod,
-            URL_PREFIX: process.env.URL_PREFIX ? JSON.stringify(process.env.URL_PREFIX) : null,
+            URL_PREFIX: process.env.URL_PREFIX ? JSON.stringify(process.env.URL_PREFIX) : `''`,
         }),
 
         // Enable subresource integrity check

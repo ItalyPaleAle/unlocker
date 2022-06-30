@@ -2,6 +2,6 @@
     "editor.codeActionsOnSave": {
         "source.fixAll": true
     },
-    "eslint.validate": ["javascript", "svelte"]
+    "eslint.validate": ["javascript", "svelte", "typescript"]
    }
   

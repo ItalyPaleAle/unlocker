@@ -7,10 +7,13 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"path"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/spf13/viper"
 )
 
 //go:generate ../client/build.sh
@@ -22,17 +25,33 @@ var staticFS embed.FS
 
 const staticBaseDir = "static"
 
-func (s *Server) serveClient(c *gin.Context) {
-	// Only respond to GET requests
-	if c.Request.Method != "GET" {
-		c.AbortWithStatusJSON(http.StatusNotFound, ErrorResponse("Not found"))
-		return
-	}
+func (s *Server) serveClient() func(c *gin.Context) {
+	// Option used during development to proxy to another server (such as a dev server)
+	clientProxyServer := viper.GetString("dev.clientProxyServer")
 
-	serveStaticFile(c, c.Request.URL.Path, staticFS)
+	if clientProxyServer == "" {
+		return func(c *gin.Context) {
+			// Only respond to GET requests
+			if c.Request.Method != "GET" {
+				c.AbortWithStatusJSON(http.StatusNotFound, ErrorResponse("Not found"))
+				return
+			}
+			serveStaticFiles(c, c.Request.URL.Path, staticFS)
+		}
+	} else {
+		u, err := url.Parse(clientProxyServer)
+		if err != nil {
+			panic(fmt.Sprintf("Failed to parse value for 'dev.clientProxyServer': %v", err))
+		}
+		proxy := proxyStaticFilesFunc(u)
+		return func(c *gin.Context) {
+			proxy.ServeHTTP(c.Writer, c.Request)
+		}
+	}
 }
 
-func serveStaticFile(c *gin.Context, reqPath string, filesystem fs.FS) {
+// Serve static files from an embedded FS
+func serveStaticFiles(c *gin.Context, reqPath string, filesystem fs.FS) {
 	reqPath = strings.TrimLeft(reqPath, "/")
 
 	// Check if the static file exists
@@ -50,7 +69,7 @@ func serveStaticFile(c *gin.Context, reqPath string, filesystem fs.FS) {
 				c.Status(http.StatusMovedPermanently)
 				return
 			}
-			serveStaticFile(c, path.Join(reqPath, "index.html"), filesystem)
+			serveStaticFiles(c, path.Join(reqPath, "index.html"), filesystem)
 			return
 		}
 		c.AbortWithStatusJSON(http.StatusNotFound, ErrorResponse("Page not found"))
@@ -86,7 +105,7 @@ func serveStaticFile(c *gin.Context, reqPath string, filesystem fs.FS) {
 		}
 
 		// Load the index.html file in the directory instead
-		serveStaticFile(c, path.Join(reqPath, "index.html"), filesystem)
+		serveStaticFiles(c, path.Join(reqPath, "index.html"), filesystem)
 		return
 	}
 
@@ -98,4 +117,15 @@ func serveStaticFile(c *gin.Context, reqPath string, filesystem fs.FS) {
 		return
 	}
 	http.ServeContent(c.Writer, c.Request, stat.Name(), stat.ModTime(), fseek)
+}
+
+// Returns a proxy that serves static files proxying from another server
+func proxyStaticFilesFunc(upstream *url.URL) *httputil.ReverseProxy {
+	proxy := httputil.NewSingleHostReverseProxy(upstream)
+	proxy.Director = func(req *http.Request) {
+		req.Host = upstream.Host
+		req.URL.Scheme = upstream.Scheme
+		req.URL.Host = upstream.Host
+	}
+	return proxy
 }

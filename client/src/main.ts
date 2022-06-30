@@ -1,11 +1,8 @@
-// Style
 import './style.css'
 
-// App
 import App from './App.svelte'
 
-const app = new App({
+// Load the app
+new App({
     target: document.body
 })
-
-export default app

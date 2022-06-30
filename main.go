@@ -134,13 +134,13 @@ func loadConfig() {
 		h := sha256.Sum256([]byte(cekStr))
 		cek = h[:]
 	} else {
+		cek = make([]byte, 16)
 		_, err := io.ReadFull(rand.Reader, cek)
 		if err != nil {
 			appLogger.Raw().Fatal().
 				AnErr("error", err).
 				Msg("Failed to generate random cookieEncryptionKey")
 		}
-
 	}
 	viper.Set("cookieEncryptionKey", cek)
 }
