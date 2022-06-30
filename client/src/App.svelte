@@ -1,35 +1,39 @@
-{#await loadSession}
-    <p>Loading…</p>
-{:then _}
-    <p>Loaded</p>
-{:catch err}
-    <p>Error while trying to connect with the </p>
-{/await}
+{#if sessionExpired}
+    <p>Your session has expired.</p>
+    <button on:click={RedirectToAuth}>Sign in again</button>
+{:else}
+    {#await loadSession}
+        <p>Loading…</p>
+    {:then _}
+        <p>Loaded</p>
+    {:catch err}
+        <p>Error while trying to connect with the </p>
+    {/await}
+{/if}
 
 <script lang="ts">
 import {Request, ResponseNotOkError} from './lib/request'
 
 import {onDestroy, onMount} from 'svelte'
 
+let loadSession: Promise<void>
+let refreshInterval = 0
+let redirectTimeout = 0
+let sessionExpired = false
+
+onMount(() => {
+    loadSession = CheckSession()
+    void loadSession.then(() => {
+        refreshInterval = setInterval(CheckSession, 10_000)
+    })
+})
+
+onDestroy(ClearRefreshInterval)
+
 type authSessionResponse = {
     ttl: number
 }
 
-let loadSession: Promise<void>
-let refreshInterval = 0
-onMount(() => {
-    loadSession = CheckSession()
-    refreshInterval = setInterval(CheckSession, 10_000)
-})
-onDestroy(() => {
-    clearInterval(refreshInterval)
-})
-
-function RedirectToAuth() {
-    window.location.href = URL_PREFIX + '/auth'
-}
-
-let redirectTimeout = 0
 async function CheckSession() {
     // Once the app loads, check if we can connect to the server and have a valid session
     try {
@@ -45,7 +49,8 @@ async function CheckSession() {
             clearTimeout(redirectTimeout)
         }
         redirectTimeout = setTimeout(() => {
-            RedirectToAuth()
+            ClearRefreshInterval()
+            sessionExpired = true
         }, res.ttl * 1000)
     }
     catch (e) {
@@ -54,5 +59,13 @@ async function CheckSession() {
             RedirectToAuth()
         }
     }
+}
+
+function ClearRefreshInterval() {
+    refreshInterval && clearInterval(refreshInterval)
+}
+
+function RedirectToAuth() {
+    window.location.href = URL_PREFIX + '/auth'
 }
 </script>
