@@ -29,6 +29,8 @@ type Server struct {
 	states     map[string]*requestState
 	lock       *sync.RWMutex
 	webhook    *utils.Webhook
+	// Subscribers that receive public events
+	pubsub *utils.Broker[*requestStatePublic]
 	// Subscriptions to watch for state changes
 	// Each state can only have one subscription
 	// If another call tries to subscribe to the same state, it will evict the first call
@@ -41,6 +43,7 @@ func (s *Server) Init(log *utils.AppLogger) error {
 	s.states = map[string]*requestState{}
 	s.lock = &sync.RWMutex{}
 	s.subs = map[string]chan *requestState{}
+	s.pubsub = utils.NewBroker[*requestStatePublic]()
 
 	// Set Gin to Release mode
 	gin.SetMode(gin.ReleaseMode)
@@ -179,6 +182,7 @@ func (s *Server) launchServer(bindAddr string, bindPort int) error {
 	}
 
 	// We received an interrupt signal, shut down the server
+	s.pubsub.Shutdown()
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	err = httpSrv.Shutdown(shutdownCtx)
 	shutdownCancel()
@@ -257,6 +261,12 @@ func (s *Server) expireRequest(stateId string, validity time.Duration) {
 
 	// Delete the state object
 	delete(s.states, stateId)
+
+	// Publish a message that the request has been removed
+	go s.pubsub.Publish(&requestStatePublic{
+		State:  stateId,
+		Status: StatusRemoved.String(),
+	})
 }
 
 // Loads the TLS certificate specified in the config file

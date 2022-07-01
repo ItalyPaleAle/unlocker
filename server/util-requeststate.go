@@ -26,9 +26,15 @@ func (r requestOperation) String() string {
 type requestStatus uint8
 
 const (
+	// Request is pending
 	StatusPending requestStatus = iota
+	// Request is completed and was successful
 	StatusComplete
+	// Request is completed and was canceled
 	StatusCanceled
+	// Request has been removed
+	// This is only used in the public response
+	StatusRemoved
 )
 
 // String representation
@@ -40,12 +46,15 @@ func (r requestStatus) String() string {
 		return "complete"
 	case StatusCanceled:
 		return "canceled"
+	case StatusRemoved:
+		return "removed"
 	default:
 		return ""
 	}
 }
 
 // requestState contains a state request
+// All fields have tag `json:"-"` to prevent accidental exposure
 type requestState struct {
 	Status     requestStatus    `json:"-"`
 	Operation  requestOperation `json:"-"`
@@ -83,10 +92,10 @@ func (rs requestState) Public(stateId string) requestStatePublic {
 type requestStatePublic struct {
 	State     string `json:"state"`
 	Status    string `json:"status"`
-	Operation string `json:"operation"`
-	KeyId     string `json:"keyId"`
-	VaultName string `json:"vaultName"`
-	Requestor string `json:"requestor"`
-	Date      int64  `json:"date"`
-	Expiry    int64  `json:"expiry"`
+	Operation string `json:"operation,omitempty"`
+	KeyId     string `json:"keyId,omitempty"`
+	VaultName string `json:"vaultName,omitempty"`
+	Requestor string `json:"requestor,omitempty"`
+	Date      int64  `json:"date,omitempty"`
+	Expiry    int64  `json:"expiry,omitempty"`
 }

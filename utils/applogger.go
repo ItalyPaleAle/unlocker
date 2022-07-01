@@ -80,7 +80,7 @@ func (a *AppLogger) LoggerMiddleware(c *gin.Context) {
 	c.Next()
 
 	// Other fields to include
-	latency := time.Since(start)
+	duration := time.Since(start)
 	clientIP := c.ClientIP()
 	statusCode := c.Writer.Status()
 	respSize := c.Writer.Size()
@@ -130,7 +130,7 @@ func (a *AppLogger) LoggerMiddleware(c *gin.Context) {
 		Str("method", method).
 		Str("path", path).
 		Str("clientIp", clientIP).
-		Dur("latency", latency).
+		Dur("duration", duration).
 		Int("respSize", respSize).
 		Msg(msg)
 }

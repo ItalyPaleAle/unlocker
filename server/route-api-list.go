@@ -1,7 +1,12 @@
 package server
 
 import (
+	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -10,7 +15,18 @@ type apiListResponse []requestStatePublic
 
 // RouteApiListGet is the handler for the GET /api/list request
 // This returns the list of all pending requests
+// If the Accept header is `application/x-ndjson`, then this sends a stream of records, updated as soon as they come in, using the NDJSON format (https://github.com/ndjson/ndjson-spec)
 func (s *Server) RouteApiListGet(c *gin.Context) {
+	accept := c.GetHeader("accept")
+	if strings.ToLower(accept) == "application/x-ndjson" {
+		s.routeApiListGetStream(c)
+	} else {
+		s.routeApiListGetSingle(c)
+	}
+}
+
+// Returns the response as a single JSON fragment
+func (s *Server) routeApiListGetSingle(c *gin.Context) {
 	res := apiListResponse{}
 
 	// Get the list of pending requests
@@ -30,4 +46,97 @@ func (s *Server) RouteApiListGet(c *gin.Context) {
 	s.lock.RUnlock()
 
 	c.JSON(http.StatusOK, res)
+}
+
+// Returns the response as a stream of NDJSON until the client disconnects or the session expires
+func (s *Server) routeApiListGetStream(c *gin.Context) {
+	// Timeout for the user's session
+	var timeout *time.Timer
+	ttlAny, ok := c.Get(contextKeySessionTTL)
+	if ok {
+		ttl, ok := ttlAny.(time.Duration)
+		if ok {
+			timeout = time.NewTimer(ttl)
+		}
+	}
+	if timeout == nil {
+		c.Error(errors.New("request did not contain a valid session TTL in context"))
+		c.AbortWithStatusJSON(http.StatusInternalServerError, InternalServerError)
+		return
+	}
+	defer timeout.Stop()
+
+	// Send the content-type header and the status code, so we can start sending data over the stream
+	c.Header("content-type", "application/x-ndjson")
+	c.Status(http.StatusOK)
+
+	// JSON stream encoder
+	enc := json.NewEncoder(c.Writer)
+	enc.SetEscapeHTML(false)
+
+	// Start by sending all the requests currently pending
+	s.lock.Lock()
+	for stateId, state := range s.states {
+		if state.Status != StatusPending || state.Processing || state.Expired() {
+			continue
+		}
+		enc.Encode(state.Public(stateId))
+	}
+
+	// Subscribe to receive new events
+	events, err := s.pubsub.Subscribe()
+	if err != nil {
+		c.Error(fmt.Errorf("error subscribing to events: %v", err))
+		c.AbortWithStatusJSON(http.StatusInternalServerError, InternalServerError)
+		s.lock.Unlock()
+		return
+	}
+
+	// Release the lock now
+	s.lock.Unlock()
+
+	// Send any data to the client
+	c.Writer.Flush()
+
+	// Unsubscribe once the method returns
+	defer s.pubsub.Unsubscribe(events)
+
+	// Process all events
+	// Stop when the request's context is canceled or if the user's session times out
+	// Every 200ms, we flush the data to the client
+	ticker := time.NewTicker(100 * time.Millisecond)
+	hasData := false
+	defer func() {
+		// Unsubscribe and stop the ticker once the method returns
+		s.pubsub.Unsubscribe(events)
+		ticker.Stop()
+		// Flush anything that may be in the buffer
+		if hasData {
+			c.Writer.Flush()
+		}
+	}()
+	for {
+		select {
+		case msg, more := <-events:
+			// Encode the event and add it to the buffer
+			if msg != nil {
+				enc.Encode(msg)
+				hasData = true
+			}
+			// If the channel is closed, return
+			if !more {
+				return
+			}
+		case <-ticker.C:
+			// Flush the buffer
+			if hasData {
+				c.Writer.Flush()
+				hasData = false
+			}
+		case <-c.Done():
+			return
+		case <-timeout.C:
+			return
+		}
+	}
 }

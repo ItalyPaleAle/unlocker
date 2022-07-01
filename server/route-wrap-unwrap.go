@@ -62,7 +62,7 @@ func (s *Server) RouteWrapUnwrap(op requestOperation) gin.HandlerFunc {
 		now := time.Now()
 		ip := c.ClientIP()
 		validity := time.Duration(req.Timeout) * time.Second
-		s.states[stateId] = &requestState{
+		state := &requestState{
 			Operation:  op,
 			Input:      val,
 			Vault:      req.Vault,
@@ -72,14 +72,11 @@ func (s *Server) RouteWrapUnwrap(op requestOperation) gin.HandlerFunc {
 			Date:       now,
 			Expiry:     now.Add(validity),
 		}
+		s.states[stateId] = state
 
 		// Invoke the webhook and send a message with the URL to unlock
-		opName := "wrap"
-		if op == OperationUnwrap {
-			opName = "unwrap"
-		}
 		err = s.webhook.SendWebhook(&utils.WebhookRequest{
-			OperationName: opName,
+			OperationName: op.String(),
 			KeyId:         req.KeyId,
 			Vault:         req.Vault,
 			StateId:       stateId,
@@ -99,6 +96,10 @@ func (s *Server) RouteWrapUnwrap(op requestOperation) gin.HandlerFunc {
 			State:   stateId,
 			Pending: true,
 		})
+
+		// Send a notification to all subscribers, in background
+		pub := state.Public(stateId)
+		go s.pubsub.Publish(&pub)
 	}
 }
 
