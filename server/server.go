@@ -27,7 +27,7 @@ type Server struct {
 	httpClient *http.Client
 	log        *utils.AppLogger
 	states     map[string]*requestState
-	lock       *sync.Mutex
+	lock       *sync.RWMutex
 	webhook    *utils.Webhook
 	// Subscriptions to watch for state changes
 	// Each state can only have one subscription
@@ -39,7 +39,7 @@ type Server struct {
 func (s *Server) Init(log *utils.AppLogger) error {
 	s.log = log
 	s.states = map[string]*requestState{}
-	s.lock = &sync.Mutex{}
+	s.lock = &sync.RWMutex{}
 	s.subs = map[string]chan *requestState{}
 
 	// Set Gin to Release mode

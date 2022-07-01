@@ -23,6 +23,7 @@ func (s *Server) RouteResult(c *gin.Context) {
 	rawResult := utils.IsTruthy(c.Query("raw"))
 
 	// Get the state and ensure the it's valid
+	// We need to use a full lock (Lock rather than RLock) because we may need to subscribe later
 	s.lock.Lock()
 	state, ok := s.states[stateId]
 	if !ok || state == nil {

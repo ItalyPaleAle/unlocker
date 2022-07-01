@@ -14,7 +14,7 @@ func (s *Server) RouteApiListGet(c *gin.Context) {
 	res := apiListResponse{}
 
 	// Get the list of pending requests
-	s.lock.Lock()
+	s.lock.RLock()
 	if len(s.states) > 0 {
 		res = make([]requestStatePublic, len(s.states))
 		i := 0
@@ -27,7 +27,7 @@ func (s *Server) RouteApiListGet(c *gin.Context) {
 		}
 		res = res[:i]
 	}
-	s.lock.Unlock()
+	s.lock.RUnlock()
 
 	c.JSON(http.StatusOK, res)
 }
