@@ -57,6 +57,8 @@ func loadConfig() {
 	viper.SetDefault("port", 8080)
 	viper.SetDefault("bind", "0.0.0.0")
 	viper.SetDefault("baseUrl", "https://localhost:8080")
+	viper.SetDefault("sessionTimeout", 300)
+	viper.SetDefault("requestTimeout", 300)
 
 	// Env
 	viper.SetEnvPrefix("UNLOCKER")
@@ -102,6 +104,18 @@ func loadConfig() {
 	if viper.GetString("webhookUrl") == "" {
 		appLogger.Raw().Fatal().
 			AnErr("error", errors.New("Config entry key 'webhookUrl' missing")).
+			Msg("Invalid configuration")
+	}
+
+	// Check for invalid values
+	if v := viper.GetInt("sessionTimeout"); v < 1 || v > 3600 {
+		appLogger.Raw().Fatal().
+			AnErr("error", errors.New("Config entry key 'sessionTimeout' is invalid: must be between 1 and 3600")).
+			Msg("Invalid configuration")
+	}
+	if v := viper.GetInt("requestTimeout"); v < 1 {
+		appLogger.Raw().Fatal().
+			AnErr("error", errors.New("Config entry key 'requestTimeout' is invalid: must be greater than 1")).
 			Msg("Invalid configuration")
 	}
 

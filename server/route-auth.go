@@ -26,8 +26,6 @@ const (
 	csrfCookieMaxAge = 5 * time.Minute
 	// Name of the Access Token cookie
 	atCookieName = "_at"
-	// Max Age for the Access Token cookie
-	atCookieMaxAge = 5 * time.Minute
 )
 
 // AccessToken contains the details of the access token
@@ -123,7 +121,7 @@ func (s *Server) RouteAuthConfirm(c *gin.Context) {
 	}
 
 	// Set the access token in a cookie
-	maxAge := int(atCookieMaxAge.Seconds())
+	maxAge := viper.GetInt("sessionTimeout")
 	err = setSecureCookie(c, atCookieName, accessToken.AccessToken, maxAge, "/", c.Request.URL.Host, secureCookie, true)
 	if err != nil {
 		_ = c.Error(err)
