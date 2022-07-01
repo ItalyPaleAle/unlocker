@@ -104,12 +104,12 @@ async function ListPending(): Promise<pendingRequestItem[]> {
         dispatch('sessionExpired', true)
     }, res.ttl * 1000)
 
-    if (!res.data?.pending?.length) {
+    if (!res.data?.length) {
         return []
     }
 
     // Filter empty values and return the list
-    return res.data.pending.filter((v) => v && v.state)
+    return res.data.filter((v) => v && v.state)
 }
 
 function ClearRefreshInterval() {

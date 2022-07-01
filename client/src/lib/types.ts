@@ -22,6 +22,4 @@ export type pendingRequestItem = {
     _status?: pendingRequestStatus
 }
 
-export type apiListResponse = {
-    pending: pendingRequestItem[]
-}
+export type apiListResponse = pendingRequestItem[]
