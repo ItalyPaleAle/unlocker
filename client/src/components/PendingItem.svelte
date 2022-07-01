@@ -50,7 +50,7 @@ function submit(confirm: boolean) {
         .then(() => Request<{confirmed?: boolean, canceled?: boolean}>('/api/confirm', {
             postData: body,
             // Set timeout to 60s as this operation can take longer
-            timeout: 40_000
+            timeout: 60000
         }))
         .then((res) => {
             if (confirm) {

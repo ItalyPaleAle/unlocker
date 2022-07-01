@@ -31,11 +31,11 @@ func (s *Server) serveClient() func(c *gin.Context) {
 
 	if clientProxyServer == "" {
 		return func(c *gin.Context) {
-			// Only respond to GET requests
-			if c.Request.Method != "GET" {
-				c.AbortWithStatusJSON(http.StatusNotFound, ErrorResponse("Not found"))
+			if !prepareStaticResponse(c) {
 				return
 			}
+
+			// Serve the request from the embedded FS
 			serveStaticFiles(c, c.Request.URL.Path, staticFS)
 		}
 	} else {
@@ -45,9 +45,37 @@ func (s *Server) serveClient() func(c *gin.Context) {
 		}
 		proxy := proxyStaticFilesFunc(u)
 		return func(c *gin.Context) {
+			if !prepareStaticResponse(c) {
+				return
+			}
+
+			// Serve the request from the proxy
 			proxy.ServeHTTP(c.Writer, c.Request)
 		}
 	}
+}
+
+// Invoked before serving static files from embedded FS or proxy
+func prepareStaticResponse(c *gin.Context) (ok bool) {
+	// Only respond to GET requests
+	if c.Request.Method != "GET" {
+		c.AbortWithStatusJSON(http.StatusNotFound, ErrorResponse("Not found"))
+		return false
+	}
+
+	// If the request is for "/" or for "/index.html", check here if the user has a cookie (but don't validate her)
+	// If there's no cookie, redirect to the auth page right away and save loading the client app
+	path := strings.TrimPrefix(c.Request.URL.Path, "/")
+	if path == "" || path == "index.html" {
+		v, err := c.Cookie(atCookieName)
+		if err != nil || v == "" {
+			c.Header("location", "/auth")
+			c.Status(http.StatusFound)
+			return false
+		}
+	}
+
+	return true
 }
 
 // Serve static files from an embedded FS
