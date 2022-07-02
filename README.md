@@ -8,7 +8,7 @@ As an example, Unlocker can be used to provide an encryption key for starting a 
 
 # How it works
 
-At a high level, Unlocker exposes two endpoints that can be used to wrap and unwrap encryption keys (where "wrapping" and "unwrapping" are synonym for "encrypting" and "decrypting" respectively). These operations are performed on Azure Key Vault, a safe, cloud-based key vault that uses strong RSA-4096 keys.
+Unlocker exposes two endpoints that can be used to wrap and unwrap encryption keys (where "wrapping" and "unwrapping" are synonym for "encrypting" and "decrypting", respectively). These operations are performed on Azure Key Vault, a safe, cloud-based key vault that uses strong RSA-4096 keys.
 
 Unlocker doesn't have standing permission to perform operations on the vault, so every time a request comes in, Unlocker sends a notification to an admin (via a webhook), who can sign into Unlocker via Azure AD and allow (or deny) the operation. Unlocker uses delegated permissions to access the Key Vault, so access is restricted to specific users via Role-Based Access Control on the Azure Key Vault resource.
 
@@ -36,11 +36,13 @@ Unlocker requires a configuration file `config.yaml` in one of the following pat
 - `$HOME/.unlocker/config.yaml`
 - Or in the same folder where the Unlocker binary is located
 
+> You can specify a custom configuration file using the `UNLOCKER_CONFIG` environmental variable.
+
 You can find an example of the configuration file, and a description of every option, in the [`config.sample.yaml`](/config.sample.yaml) file.
 
 Keys can also be passed as environmental variables with the `UNLOCKER_` prefix.
 
-All configuration options (all strings):
+All configuration options:
 
 - **`azureClientId`** (**required**):  
   Client ID of the Azure AD application (see the [Azure AD application](#azure-ad-application) step in the [Set up](#set-up) section below).  
@@ -51,12 +53,6 @@ All configuration options (all strings):
 - **`azureTenantId`** (**required**):  
   Tenant ID of the Azure AD application.  
   Environmental variable name: `UNLOCKER_AZURETENANTID`
-- **`tlsCert`** (optional, default: `tls-cert.pem` in the same folder as the `config.yaml` file):  
-  Path to a TLS certificate (PEM-encoded), or alternatively the entire PEM-encoded certificate as a string. Note that while this value is optional, a TLS certificate is **required** (even if self-signed).  
-  Environmental variable name: `UNLOCKER_TLSCERT`
-- **`tlsKey`** (optional, default: `tls-key.pem` in the same folder as the `config.yaml` file):  
-  Path to a TLS key (PEM-encoded), or alternatively the entire PEM-encoded key as a string. Note that while this value is optional, a TLS certificate is **required** (even if self-signed).  
-  Environmental variable name: `UNLOCKER_TLSKEY`
 - **`webhookUrl`** (**required**):  
   Endpoint of the webhook, where notifications are sent to.  
   Environmental variable name: `UNLOCKER_WEBHOOKURL`
@@ -77,13 +73,31 @@ All configuration options (all strings):
 - **`bind`** (optional, default: `0.0.0.0`):  
   Address/interface to bind to.  
   Environmental variable name: `UNLOCKER_BIND`
+- **`tlsCert`** (optional, default: `tls-cert.pem` in the same folder as the `config.yaml` file):  
+  Path to a TLS certificate (PEM-encoded), or alternatively the entire PEM-encoded certificate as a string. Note that while this value is optional, a TLS certificate is **required** (even if self-signed).  
+  Environmental variable name: `UNLOCKER_TLSCERT`
+- **`tlsKey`** (optional, default: `tls-key.pem` in the same folder as the `config.yaml` file):  
+  Path to a TLS key (PEM-encoded), or alternatively the entire PEM-encoded key as a string. Note that while this value is optional, a TLS certificate is **required** (even if self-signed).  
+  Environmental variable name: `UNLOCKER_TLSKEY`
 - **`allowedIps`** (optional):  
   If set, allows connections to the APIs only from the IPs or ranges set here. You can set individual IP addresses (IPv4 or IPv6) or ranges in the CIDR notation, and you can add multiple values separated by commas. For example, to allow connections from localhost and IPs in the `10.x.x.x` range only, set this to: `127.0.0.1,10.0.0.0/8`.  
   Note that this value is used to restrict connections to the `/wrap`, `/unwrap`, and `/status` endpoints only. It does not restrict the endpoints used by administrators to confirm (or deny) requests.  
   Environmental variable name: `UNLOCKER_ALLOWEDIPS`
 - **`origins`** (optional, default is equal to the value of `baseUrl`):  
-  Comma-separated lists of origins that are allowed for CORS. This should be a list of all URLs admins can access Unlocker at. Alternatively, set this to `*` to allow any origin.  
+  Comma-separated lists of origins that are allowed for CORS. This should be a list of all URLs admins can access Unlocker at. Alternatively, set this to `*` to allow any origin (not recommended).  
   Environmental variable name: `UNLOCKER_ORIGINS`
+- **`sessionTimeout`** (optional, default: `300`, i.e. 5 minutes):  
+  Timeout for sessions before having to authenticate again, in seconds. This cannot be more than 3600 (1 hour).  
+  Environmental variable name: `UNLOCKER_SESSIONTIMEOUT`
+- **`requestTimeout`** (optional, default: `300`, i.e. 5 minutes):  
+  Default timeout for wrap and unwrap requests, in seconds. This is the default value, and can be overridden in each request.  
+  Environmental variable name: `UNLOCKER_REQUESTTIMEOUT`
+- **`tokenSigningKey`** (optional, will be randomly generated at startup if empty):  
+  String used as key to sign state tokens. If left empty (recommended), it will be randomly generated every time the app starts  
+  Environmental variable name: `UNLOCKER_TOKENSIGNINGKEY`
+- **`cookieEncryptionKey`** (optional, will be randomly generated at startup if empty):  
+  String used as key to encrypt cookies. If left empty (recommended), it will be randomly generated every time the app starts  
+  Environmental variable name: `UNLOCKER_COOKIEENCRYPTIONKEY`
 
 > To generate a self-signed TLS certificate, you can use:
 >
@@ -104,10 +118,10 @@ docker run \
   -d \
   -p 8080:8080 \
   -v $HOME/.unlocker:/etc/unlocker \
-  ghcr.io/italypaleale/unlocker:0.1
+  ghcr.io/italypaleale/unlocker:0.2
 ```
 
-> Unlocker follows semver for versioning. The command above uses the latest version in the 0.1 branch. We do not publish a container image tagged "latest".
+> Unlocker follows semver for versioning. The command above uses the latest version in the 0.2 branch. We do not publish a container image tagged "latest".
 
 ### Start as standalone app
 
@@ -161,7 +175,7 @@ To wrap (encrypt) a key, first make a POST request to the **`/wrap`** endpoint. 
 - **`keyId`** (string): The name of the key stored in the Key Vault.
 - Optional keys:
   - **`keyVersion`** (string): The version of the key stored in Key Vault to use; if omitted, it defaults to the latest key.
-  - **`timeout`** (integer): An optional timeout for the operation, in seconds; default is 300 seconds (or 5 minutes). If an admin doesn't approve (or deny) the operation in that timeframe, the request is automatically canceled.
+  - **`timeout`** (integer): An optional timeout for the operation, in seconds. If empty, the value is taken from the configuration option `requestTimeout` (whose default value is 300 seconds, or 5 minutes). If an admin doesn't approve (or deny) the operation in that timeframe, the request is automatically canceled.
 
 For example, with curl and the sample data above (note that `aGVsbG93b3JsZA==` is the base64-encoded representation of `helloworld`, the key we want to encrypt; we are also setting an optional timeout of 10 minutes, or 600 seconds):
 
@@ -178,8 +192,8 @@ The response will be a JSON object similar to this, where `state` is the ID of t
 
 ```json
 {
-  "state":"4336d140-2ba1-4d7a-af84-a83d564e384b",
-  "pending":true
+  "state": "4336d140-2ba1-4d7a-af84-a83d564e384b",
+  "pending": true
 }
 ```
 
@@ -210,9 +224,9 @@ A **successful**, final response will contain a JSON body similar to:
 
 ```json
 {
-  "state":"a6dfdcea-3330-4f55-91f7-2ec9ea02370a",
-  "done":true,
-  "value":"pftzpouF10Dvg1dFcHuxk1sHr3dVauTydCyJS4NRl2rQrWK6ZpGgZCIArX+svYaYo3vYYqvxGzJIeqDTCr11fM4HbqgHO/W9HR8lQZKsIbeyfq1gLQ3sBGrpTwa5HABU889387AjXDshhEHI6L9D7JHBzKE1+eXWhQL9RtxbnfsHTQ49nCS5AXLetzDuwJRxWSZzTqNu8XILsEv91y41jtc8LOxOpDudc3tRJ6KNNNxCsehnuzBmZPqh/OhAH8AHZz1gESQGhRQKiZVgobLT7uzGlv0zPqTU2jbp1swF7apADnjdcUl93nYeBaOH3KqXs1PK12C14fV6qfwTMTsQTRM6OFB2FYTGeGoq5Gfo8FtnK7/oIIDtqo2RaK+83SexM1Fe3GNw7dU3zckGCpVjzLtHJZiYcP5VnybmFPmFV1RrsEnR4aMAigFkFEE/oZcsS8ZDwtwRPGGUEoCpZw8vqCzk1/2rtHmwkcSRCuoGR0s2yR9t889hc3C5r490zP+qGZ7fh/jBizXvJMCYjYA4z/A5LXOTENGEq3Mq0SWlh6+zxaP95+sKho7P3pHsIf9mK6VLWm2jhbWADx9R59DIoP6nKRtYivEk7UoI7tV9N7krgD1sMzK/Kk4YXu7mETAQR8o77Vo5dX+UJgF+jsNPrkG16x8TInKCeDYawMlxVIk="
+  "state": "a6dfdcea-3330-4f55-91f7-2ec9ea02370a",
+  "done": true,
+  "value": "pftzpouF10Dvg1dFcHuxk1sHr3dVauTydCyJS4NRl2rQrWK6ZpGgZCIArX+svYaYo3vYYqvxGzJIeqDTCr11fM4HbqgHO/W9HR8lQZKsIbeyfq1gLQ3sBGrpTwa5HABU889387AjXDshhEHI6L9D7JHBzKE1+eXWhQL9RtxbnfsHTQ49nCS5AXLetzDuwJRxWSZzTqNu8XILsEv91y41jtc8LOxOpDudc3tRJ6KNNNxCsehnuzBmZPqh/OhAH8AHZz1gESQGhRQKiZVgobLT7uzGlv0zPqTU2jbp1swF7apADnjdcUl93nYeBaOH3KqXs1PK12C14fV6qfwTMTsQTRM6OFB2FYTGeGoq5Gfo8FtnK7/oIIDtqo2RaK+83SexM1Fe3GNw7dU3zckGCpVjzLtHJZiYcP5VnybmFPmFV1RrsEnR4aMAigFkFEE/oZcsS8ZDwtwRPGGUEoCpZw8vqCzk1/2rtHmwkcSRCuoGR0s2yR9t889hc3C5r490zP+qGZ7fh/jBizXvJMCYjYA4z/A5LXOTENGEq3Mq0SWlh6+zxaP95+sKho7P3pHsIf9mK6VLWm2jhbWADx9R59DIoP6nKRtYivEk7UoI7tV9N7krgD1sMzK/Kk4YXu7mETAQR8o77Vo5dX+UJgF+jsNPrkG16x8TInKCeDYawMlxVIk="
 }
 ```
 
@@ -239,7 +253,7 @@ To unwrap a key, first make a POST request to the **`/unwrap`** endpoint. The PO
 - **`keyId`** (string): The name of the key stored in the Key Vault.
 - Optional keys:
   - **`keyVersion`** (string): The version of the key stored in Key Vault to use; if omitted, it defaults to the latest key.
-  - **`timeout`** (integer): An optional timeout for the operation, in seconds; default is 300 seconds (or 5 minutes). If an admin doesn't approve (or deny) the operation in that timeframe, the request is automatically canceled.
+  - **`timeout`** (integer): An optional timeout for the operation, in seconds. If empty, the value is taken from the configuration option `requestTimeout` (whose default value is 300 seconds, or 5 minutes). If an admin doesn't approve (or deny) the operation in that timeframe, the request is automatically canceled.
 
 For example, to unwrap the key wrapped above with curl, we can make this request (note that the `value` field contains the key that was wrapped earlier, partially omitted here for legibility):
 
@@ -254,8 +268,8 @@ The response will be a JSON object similar to this, where `state` is the ID of t
 
 ```json
 {
-  "state":"4336d140-2ba1-4d7a-af84-a83d564e384b",
-  "pending":true
+  "state": "4336d140-2ba1-4d7a-af84-a83d564e384b",
+  "pending": true
 }
 ```
 
@@ -285,9 +299,9 @@ A **successful**, final response will contain a JSON body similar to:
 
 ```json
 {
-  "state":"a6dfdcea-3330-4f55-91f7-2ec9ea02370a",
-  "done":true,
-  "value":"aGVsbG93b3JsZA=="
+  "state": "a6dfdcea-3330-4f55-91f7-2ec9ea02370a",
+  "done": true,
+  "value": "aGVsbG93b3JsZA=="
 }
 ```
 
@@ -318,7 +332,7 @@ Before you can deploy and use Unlocker, you need to perform a few setup steps to
 
 All the steps below must be run on your laptop before you deploy the app. At the end, you'll have the values required for the `config.yaml` file and for making requests to the service.
 
-You will need an Azure subscription to deploy these services. You can start a [free trial](https://azure.com/free) here. All the services we need for Unlocker are free (Azure AD) or very inexpensive (for this scenario, you should not spend more than a few cents on Azure Key Vault every month).
+You will need an Azure subscription to deploy these services; if you don't have one, you can start a [free trial](https://azure.com/free). All the services we need for Unlocker are either free (Azure AD) or very inexpensive (for most scenarios, you should not spend more than a few cents on Azure Key Vault every month).
 
 ### Requirements
 
@@ -400,7 +414,7 @@ az keyvault key create \
 
 Take note of the value of `KEYVAULT_KEY`, which will be used when making requests to the unlocker service.
 
-> Important: the command above generates a new RSA key within the Key Vault and returns the public part of the key. Because keys cannot be extracted from Azure Key Vault, you will never see the private key, and there's no way to obtain that (you can, however, create backups that only work inside Azure Key Vault). If you need access to the private key, consider importing a key inside the Key Vault rather than having it generate a new one for you.
+> Important: the command above generates a new RSA key within the Key Vault and returns the public part of the key. Because keys cannot be extracted from Azure Key Vault, you will never see the private key, and there's no way to obtain that (you can, however, create backups that only work inside Azure Key Vault). If you need access to the private key, consider importing a key inside the Key Vault rather than having it generate a new one for you (e.g. [using the Azure CLI](https://docs.microsoft.com/en-us/cli/azure/keyvault/key?view=azure-cli-latest#az-keyvault-key-import)).
 
 ### Azure AD application
 
@@ -410,7 +424,7 @@ Create an app in Azure AD to access Azure Key Vault with an user's delegated per
 # Friendly name for the application
 APP_NAME="Unlocker"
 
-# Create the app
+# Create the app and set the redirect URIs
 APP_ID=$(az ad app create \
   --display-name $APP_NAME \
   --available-to-other-tenants false \
@@ -427,9 +441,6 @@ az ad app permission add \
   --id $APP_ID \
   --api cfa8b339-82a2-471a-a3c9-0fc0be7a4093 \
   --api-permissions f53da476-18e3-4152-8e01-aec403e6edc0=Scope
-#az ad app permission grant \
-#  --id $APP_ID \
-#  --api cfa8b339-82a2-471a-a3c9-0fc0be7a4093
 
 # Add the client secret
 az ad app credential reset \
