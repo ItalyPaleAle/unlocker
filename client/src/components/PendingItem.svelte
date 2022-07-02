@@ -1,17 +1,17 @@
 <div class="my-2">
     {#if error}
-        <p>Error: {error}</p>
+        <p class="p-2 border rounded-sm bg-rose-50 dark:bg-rose-800 text-rose-800 dark:text-white border-rose-700 dark:border-rose-900">Error: {error}</p>
     {/if}
     <div class="flex flex-row">
-        <div class="flex-none mr-4 w-14 h-14 text-slate-700 dark:text-slate-300">
+        <div class="flex-none pt-2 mr-4 w-14 h-14 text-slate-700 dark:text-slate-300">
             {#if item.operation == 'wrap'}
                 <Icon icon="lock-closed" title="Wrap request" size="14" />
             {:else if item.operation == 'unwrap'}
                 <Icon icon="lock-open" title="Unwrap request" size="14" />
             {/if}
         </div>
-        <div>
-            <div>
+        <div class="space-y-2">
+            <div class="space-y-0.5">
                 <span class="flex flex-row items-center">
                     <span class="flex-none w-6 pr-2"></span>
                     <span class="flex-grow">

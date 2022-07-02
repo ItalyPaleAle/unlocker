@@ -1,15 +1,18 @@
+<h1 class="text-lg font-medium text-slate-900 dark:text-white">Pending requests</h1>
+
 {#if pageError}
     <p>Error while requesting the list of pending items: {pageError}</p>
 {/if}
 {#if list === null}
-    <p class="text-lg text-center">
-        <LoadingSpinner /> Loading…
-    </p>
+    <div class="px-8 py-8 mx-auto my-4 text-lg text-center bg-white rounded-lg shadow-lg lg:text-left lg:pl-20 dark:bg-slate-800 ring-1 ring-slate-900/5 text-slate-700 dark:text-slate-200">
+        <LoadingSpinner size="3rem" /> Loading…
+    </div>
 {:else}
     <div class="space-y-4">
-        <h1 class="text-lg font-medium text-slate-900 dark:text-white">Pending requests</h1>
         {#each Object.entries(list) as [state, item] (state)}
-            <PendingItem {item} />
+            <div class="px-4 py-2 mx-auto my-4 bg-white rounded-lg shadow-lg dark:bg-slate-800 ring-1 ring-slate-900/5 text-slate-700 dark:text-slate-200">
+                <PendingItem {item} />
+            </div>
         {:else}
             <p>There's no request pending your action at this time.</p>
             <p class="text-sm">Need help getting started? Check out the <a href="https://github.com/italypaleale/unlocker#apis" class="underline hover:text-slate-900 hover:dark:text-white">documentation</a> for the APIs.</p>
@@ -99,7 +102,6 @@ function Subscribe(): () => void {
                 if (redirectTimeout) {
                     clearTimeout(redirectTimeout)
                 }
-                console.log('session TTL', ttl)
                 // Send the signal 1 second earlier so this is triggered before the server closes the request
                 // If the server gets to this before the client, the loop is restarted and the client is redirected (see above where we check for 401 responses) rather than seeing a message here
                 redirectTimeout = setTimeout(() => {
@@ -146,8 +148,10 @@ function UpdateList(el: pendingRequestItem) {
     }
 
     // Set or update the element in the list
-    if (!list[el.state]?.status || list[el.state]?.status == pendingRequestStatus.pendingRequestPending) {
+    if (!list[el.state]?.status) {
         list[el.state] = el
+    } else if (list[el.state].status == pendingRequestStatus.pendingRequestPending) {
+        list[el.state].status = el.status
     }
 
     // Force a refresh
