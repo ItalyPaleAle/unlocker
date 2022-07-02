@@ -1,119 +1,150 @@
-{#await pendingRequest}
+{#if pageError}
+    <p>Error while requesting the list of pending items: {pageError}</p>
+{/if}
+{#if list === null}
     <p>Loading…</p>
-{:then _}
+{:else}
     <p>Loaded</p>
     <pre class="text-xs">{JSON.stringify(list, null, '  ')}</pre>
     {#each Object.entries(list) as [state, item] (state)}
         <PendingItem {item} />
     {/each}
-{:catch err}
-    <p>Error while requesting the list of pending items: {err}</p>
-{/await}
+{/if}
 
 <script lang="ts">
 import PendingItem from './PendingItem.svelte'
 
-import {Request, ResponseNotOkError, URLPrefix, type Response as RequestResponse} from '../lib/request'
-import {type pendingRequestItem, type apiListResponse, pendingRequestStatus} from '../lib/types'
+import {ThrowResponseNotOk, URLPrefix} from '../lib/request'
+import {pendingRequestStatus, type pendingRequestItem} from '../lib/types'
+import ndjson from '../lib/ndjson'
 
 import {createEventDispatcher, onDestroy, onMount} from 'svelte'
 
 const dispatch = createEventDispatcher()
 
-let list: Record<string, pendingRequestItem> = {}
-// Initialize with a Promise that never resolves to start
-// eslint-disable-next-line @typescript-eslint/no-empty-function
-let pendingRequest: Promise<void> = new Promise(() => {})
-let refreshInterval = 0
+let list: Record<string, pendingRequestItem>|null = null
+let pageError: string|null = null
 let redirectTimeout = 0
 
+let stop: (() => void) | null
 onMount(() => {
-    // Request the list of pending items
-    pendingRequest = RefreshList()
-
-    // Refresh in background every 5 seconds
-    void pendingRequest.then(() => {
-        refreshInterval = setInterval(() => {
-            // Refresh in background
-            void RefreshList()
-        }, 5_000)
-    })
+    // Subscribe to the list of pending items
+    stop = Subscribe()
 })
 
-onDestroy(ClearRefreshInterval)
+onDestroy(() => {
+    if (stop) {
+        stop()
+        stop = null
+    }
+})
 
-// Refreshes the values of "list"
-async function RefreshList(): Promise<void> {
-    // Request the list of pending items
-    const res = await ListPending()
-    const listKeys = Object.keys(list)
-    for (let i = 0; i < res.length; i++) {
-        const state = res[i].state
-        // If an element already exists, remove the key from the list
-        if (list[state]) {
-            const idx = listKeys.indexOf(state)
-            if (idx > -1) {
-                listKeys.splice(idx, 1)
-            }
-            continue
-        }
-        // Add the new elements
-        list[state] = res[i]
+// Subscribe to the stream of pending states
+// Returns a function that stops the stream
+function Subscribe(): () => void {
+    let controller: AbortController | null = null
+
+    const stop = () => {
+        controller && controller.abort()
+        controller = null
     }
 
-    // All items that remain in listKeys are those that have been removed or completed
-    for (let i = 0; i < listKeys.length; i++) {
-        if (list[listKeys[i]]._status === undefined) {
-            list[listKeys[i]]._status = pendingRequestStatus.pendingRequestRemoved
+    // Start the subscription in background
+    void (async () => {
+        try {
+            while (!controller || !controller.signal.aborted) {
+                controller = new AbortController()
+
+                // We can't use the higher-level Request API here because we need to get access to the stream
+                const res = await fetch(URLPrefix + '/api/list', {
+                    headers: new Headers({
+                        accept: 'application/x-ndjson '
+                    }),
+                    credentials: 'same-origin',
+                    cache: 'no-store',
+                    signal: controller.signal
+                })
+                if (!res.ok) {
+                    // If the error is that we got a 401 response, redirect to the auth page
+                    if (res.status == 401) {
+                        RedirectToAuth()
+                        return
+                    }
+                    await ThrowResponseNotOk(res)
+                }
+
+                // Check if the session has expired
+                let ttl = 0
+                const ttlHeader = res.headers.get('x-session-ttl')
+                if (ttlHeader) {
+                    ttl = parseInt(ttlHeader, 10)
+                    if (ttl < 1) {
+                        ttl = 0
+                    }
+                }
+                if (ttl < 2) {
+                    stop()
+                    RedirectToAuth()
+                    return
+                }
+
+                // When the session has expired, send a notification to the App
+                if (redirectTimeout) {
+                    clearTimeout(redirectTimeout)
+                }
+                console.log('session TTL', ttl)
+                // Send the signal 1 second earlier so this is triggered before the server closes the request
+                // If the server gets to this before the client, the loop is restarted and the client is redirected (see above where we check for 401 responses) rather than seeing a message here
+                redirectTimeout = setTimeout(() => {
+                    stop()
+                    dispatch('sessionExpired', true)
+                }, (ttl - 1) * 1000)
+
+                // Get the stream of NDJSON messages
+                if (!res.body) {
+                    throw Error('Response does not contain any body')
+                }
+
+                // We have a stream now so we can initialize the list
+                if (list === null) {
+                    list = {}
+                }
+
+                const gen = ndjson<pendingRequestItem>(res.body.getReader())
+                while (true) { // eslint-disable-line no-constant-condition
+                    const {done, value} = await gen.next()
+                    console.log(done, value)
+                    // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+                    if (done) {
+                        break
+                    }
+                    if (value) {
+                        UpdateList(value)
+                    }
+                }
+            }
+        } catch (err) {
+            // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
+            pageError = 'Error: ' + err
+            stop()
         }
+    })()
+
+    return stop
+}
+
+function UpdateList(el: pendingRequestItem) {
+    if (!el?.state || !list) {
+        return
+    }
+
+    // Set or update the element in the list
+    if (!list[el.state]?.status || list[el.state]?.status == pendingRequestStatus.pendingRequestPending) {
+        list[el.state] = el
     }
 
     // Force a refresh
     list = list
-}
-
-// Fetches the list of pending items from the server
-// It also sets a timeout that causes sessionExpired message when the user's session has expired
-async function ListPending(): Promise<pendingRequestItem[]> {
-    // Once the app loads, check if we can connect to the server and have a valid session
-    let res: RequestResponse<apiListResponse>
-    try {
-        // Request the list
-        res = await Request<apiListResponse>('/api/list')
-    } catch (e) {
-        // If the error is that we got a 401 response, redirect to the auth page
-        if (e instanceof ResponseNotOkError && e.statusCode == 401) {
-            RedirectToAuth()
-        }
-        // Re-throw any other error
-        throw e
-    }
-
-    // Check if the session has expired
-    if (!res?.ttl || res.ttl < 1) {
-        RedirectToAuth()
-        return []
-    }
-
-    // When the session has expired, send a notification to the App
-    if (redirectTimeout) {
-        clearTimeout(redirectTimeout)
-    }
-    redirectTimeout = setTimeout(() => {
-        ClearRefreshInterval()
-        dispatch('sessionExpired', true)
-    }, res.ttl * 1000)
-
-    if (!res.data?.length) {
-        return []
-    }
-
-    // Filter empty values and return the list
-    return res.data.filter((v) => v && v.state)
-}
-
-function ClearRefreshInterval() {
-    refreshInterval && clearInterval(refreshInterval)
 }
 
 function RedirectToAuth() {

@@ -15,12 +15,13 @@ export function waitPromise(time: number): Promise<void> {
  *
  * @param promise Promise to execute
  * @param timeout Timeout in ms
+ * @param message Optional error message
  * @returns Promise with a timeout
  */
-export function timeoutPromise<T>(promise: Promise<T>, timeout: number): Promise<T> {
+export function timeoutPromise<T>(promise: Promise<T>, timeout: number, message?: string): Promise<T> {
     return Promise.race([
         waitPromise(timeout).then(() => {
-            throw new TimeoutError('Promise has timed out')
+            throw new TimeoutError(message || 'Promise has timed out')
         }),
         promise
     ])

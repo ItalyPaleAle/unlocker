@@ -6,14 +6,16 @@
         Request to <b>{item.operation}</b> a key, using the key <b>{item.keyId}</b> from the Azure Key Vault <b>{item.vaultName}</b>. Submitted by <b>{item.requestor}</b> on <b>{item.date}</b>.
     </p>
     {#await submitting}
-        <p>Submitting...</p>
+        <p>Working on it...</p>
     {:then _}
-        {#if item._status === pendingRequestStatus.pendingRequestRemoved}
+        {#if item.status === pendingRequestStatus.pendingRequestRemoved}
             <p>This request has already been completed or has expired</p>
-        {:else if item._status === pendingRequestStatus.pendingRequestConfirmed}
+        {:else if item.status === pendingRequestStatus.pendingRequestConfirmed}
             <p>Request confirmed</p>
-        {:else if item._status === pendingRequestStatus.pendingRequestCanceled}
+        {:else if item.status === pendingRequestStatus.pendingRequestCanceled}
             <p>Request canceled</p>
+        {:else if item.status === pendingRequestStatus.pendingRequestProcessing_Client}
+            <p>Working on it...</p>
         {:else}
             <div id="prompt">
                 <button on:click={() => submit(true)}>Confirm</button>
@@ -46,6 +48,9 @@ function submit(confirm: boolean) {
         body.cancel = true
     }
 
+    // Make the request as processing in the client, so its status won't be changed to "removed" by the server
+    item.status = pendingRequestStatus.pendingRequestProcessing_Client
+
     submitting = Promise.resolve()
         .then(() => Request<{confirmed?: boolean, canceled?: boolean}>('/api/confirm', {
             postData: body,
@@ -57,12 +62,12 @@ function submit(confirm: boolean) {
                 if (res?.data?.confirmed !== true) {
                     throw Error('The operation was not confirmed')
                 }
-                item._status = pendingRequestStatus.pendingRequestConfirmed
+                item.status = pendingRequestStatus.pendingRequestConfirmed
             } else {
                 if (res?.data?.canceled !== true) {
                     throw Error('The operation was not canceled')
                 }
-                item._status = pendingRequestStatus.pendingRequestCanceled
+                item.status = pendingRequestStatus.pendingRequestCanceled
             }
             item = item
         })

@@ -102,20 +102,9 @@ export async function Request<T>(url: string, options?: RequestOptions): Promise
             throw Error('Response was not JSON')
         }
 
-        // Get the JSON data from the response
-        const body = (await response.json()) as T
-
         // Check if we have a response with status code 200-299
-        if (!response.ok) {
-            const e = new ResponseNotOkError('Invalid response status code')
-            e.statusCode = response.status
-            if ((body as unknown as {error: string})?.error) {
-                // eslint-disable-next-line no-console
-                console.error('Invalid response status code')
-                e.message = (body as unknown as {error: string}).error
-            }
-            throw e
-        }
+        // Otherwise, this method throws
+        await ThrowResponseNotOk(response)
 
         // Get the TTL
         let ttl: number|undefined = undefined
@@ -126,6 +115,9 @@ export async function Request<T>(url: string, options?: RequestOptions): Promise
                 ttl = 0
             }
         }
+
+        // Get the JSON data from the response
+        const body = (await response.json()) as T
 
         // Response
         return {
@@ -138,5 +130,23 @@ export async function Request<T>(url: string, options?: RequestOptions): Promise
             throw Error('Request has timed out')
         }
         throw err
+    }
+}
+
+/**
+ * Throws an error when the response is not OK
+ * @param response Response object
+ */
+export async function ThrowResponseNotOk(response: globalThis.Response) {
+    if (!response.ok) {
+        const e = new ResponseNotOkError('Invalid response status code')
+        e.statusCode = response.status
+        const body = (await response.json()) as {error: string}
+        if (body?.error) {
+            // eslint-disable-next-line no-console
+            console.error('Invalid response status code')
+            e.message = body.error
+        }
+        throw e
     }
 }

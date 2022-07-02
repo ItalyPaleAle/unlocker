@@ -111,7 +111,9 @@ module.exports = {
     ],
     mode,
     devServer: {
-        port: 3000
+        port: 3000,
+        // We can't use websockets over a proxy
+        webSocketServer: false
     },
     devtool: prod ? false : 'source-map'
 }

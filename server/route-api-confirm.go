@@ -66,7 +66,7 @@ func (s *Server) RouteApiConfirmPost(c *gin.Context) {
 	// Because the request is not pending anymore, send a notification that it has been removed
 	go s.pubsub.Publish(&requestStatePublic{
 		State:  req.StateId,
-		Status: StatusCanceled.String(),
+		Status: StatusRemoved.String(),
 	})
 
 	if req.Cancel {

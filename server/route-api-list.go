@@ -73,6 +73,7 @@ func (s *Server) routeApiListGetStream(c *gin.Context) {
 	// JSON stream encoder
 	enc := json.NewEncoder(c.Writer)
 	enc.SetEscapeHTML(false)
+	sent := false
 
 	// Start by sending all the requests currently pending
 	s.lock.Lock()
@@ -80,6 +81,7 @@ func (s *Server) routeApiListGetStream(c *gin.Context) {
 		if state.Status != StatusPending || state.Processing || state.Expired() {
 			continue
 		}
+		sent = true
 		enc.Encode(state.Public(stateId))
 	}
 
@@ -94,6 +96,11 @@ func (s *Server) routeApiListGetStream(c *gin.Context) {
 
 	// Release the lock now
 	s.lock.Unlock()
+
+	// If we haven't sent any record yet, send an empty line so the client receives a byte
+	if !sent {
+		c.Writer.Write([]byte{0x0A})
+	}
 
 	// Send any data to the client
 	c.Writer.Flush()
@@ -133,7 +140,7 @@ func (s *Server) routeApiListGetStream(c *gin.Context) {
 				c.Writer.Flush()
 				hasData = false
 			}
-		case <-c.Done():
+		case <-c.Request.Context().Done():
 			return
 		case <-timeout.C:
 			return
