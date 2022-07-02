@@ -2,16 +2,22 @@
     <p>Error while requesting the list of pending items: {pageError}</p>
 {/if}
 {#if list === null}
-    <p>Loading…</p>
+    <p class="text-lg text-center">
+        <LoadingSpinner /> Loading…
+    </p>
 {:else}
-    <p>Loaded</p>
-    <pre class="text-xs">{JSON.stringify(list, null, '  ')}</pre>
-    {#each Object.entries(list) as [state, item] (state)}
-        <PendingItem {item} />
-    {/each}
+    <div class="space-y-3">
+        <h1 class="text-lg font-medium text-slate-900 dark:text-white">Pending requests</h1>
+        {#each Object.entries(list) as [state, item] (state)}
+            <PendingItem {item} />
+        {:else}
+            <p>There's no request pending your action</p>
+        {/each}
+    </div>
 {/if}
 
 <script lang="ts">
+import LoadingSpinner from './LoadingSpinner.svelte'
 import PendingItem from './PendingItem.svelte'
 
 import {ThrowResponseNotOk, URLPrefix} from '../lib/request'
