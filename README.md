@@ -326,6 +326,14 @@ curl --insecure "https://10.20.30.40:8080/result/${STATE_ID}?raw=1"
 # A successful response will contain binary data; in our example that would be "helloworld"
 ```
 
+### Supported algorithms and keys
+
+Unlocker can wrap and unwrap data using keys stored in Azure Key Vault only, either software-protected or HSM-protected.
+
+Unlocker only supports RSA keys. Although all key sizes supported by Azure Key Vault can be used with Unlocker, we strongly recommend using 4096-bit keys for the best security.
+
+Unlocker uses RSA-OAEP with SHA-256 (identified as `RSA-OAEP-256` in Azure Key Vault) as algorithm and mode of operation, to offer the best security. This value is not configurable.
+
 ## Set up
 
 Before you can deploy and use Unlocker, you need to perform a few setup steps to create resources on Azure: a Key Vault and an Azure AD application that allows the admin to authenticate and allow or deny operations.
