@@ -6,12 +6,13 @@
         <LoadingSpinner /> Loading…
     </p>
 {:else}
-    <div class="space-y-3">
+    <div class="space-y-4">
         <h1 class="text-lg font-medium text-slate-900 dark:text-white">Pending requests</h1>
         {#each Object.entries(list) as [state, item] (state)}
             <PendingItem {item} />
         {:else}
-            <p>There's no request pending your action</p>
+            <p>There's no request pending your action at this time.</p>
+            <p class="text-sm">Need help getting started? Check out the <a href="https://github.com/italypaleale/unlocker#apis" class="underline hover:text-slate-900 hover:dark:text-white">documentation</a> for the APIs.</p>
         {/each}
     </div>
 {/if}

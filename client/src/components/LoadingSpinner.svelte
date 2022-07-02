@@ -1,4 +1,7 @@
-<!-- Source: https://loading.io/css/ -->
+<!--
+Based on:https://loading.io/css/
+License: CC0
+-->
 <div class="lds-ring" style="--ring-size: {size}">
     <div></div><div></div><div></div><div></div>
 </div>
