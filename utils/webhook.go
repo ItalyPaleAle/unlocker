@@ -20,7 +20,7 @@ type Webhook struct {
 func (w *Webhook) Init() {
 	// Init a HTTP client
 	w.httpClient = &http.Client{
-		Timeout: 10 * time.Second,
+		Timeout: 15 * time.Second,
 	}
 }
 
@@ -50,7 +50,7 @@ func (w *Webhook) SendWebhook(data *WebhookRequest) (err error) {
 }
 
 func (w *Webhook) getLink(data *WebhookRequest) string {
-	return viper.GetString("baseUrl") + "/auth?state=" + data.StateId
+	return viper.GetString("baseUrl")
 }
 
 func (w *Webhook) preparePlainRequest(data *WebhookRequest) (req *http.Request, err error) {
