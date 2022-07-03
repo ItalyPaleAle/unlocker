@@ -45,7 +45,7 @@
                 {:else if item.status === pendingRequestStatus.pendingRequestCanceled}
                     <p>Request canceled</p>
                 {:else if item.status === pendingRequestStatus.pendingRequestProcessing_Client}
-                    <p>Working on it...</p>
+                    <p><LoadingSpinner /> Working on it…</p>
                 {:else}
                     <div class="flex flex-row">
                         <div role="button"
@@ -80,6 +80,7 @@ import {Request} from '../lib/request'
 import {pendingRequestStatus, type pendingRequestItem} from '../lib/types'
 
 import Icon from './Icon.svelte'
+import LoadingSpinner from './LoadingSpinner.svelte'
 
 export let item: pendingRequestItem
 
