@@ -1,7 +1,7 @@
 <h1 class="text-lg font-medium text-slate-900 dark:text-white">Pending requests</h1>
 
 {#if pageError}
-    <p>Error while requesting the list of pending items: {pageError}</p>
+    <p class="p-2 mt-2 border rounded-sm bg-rose-50 dark:bg-rose-800 text-rose-800 dark:text-white border-rose-700 dark:border-rose-900">Failed to list pending items: {pageError}</p>
 {/if}
 {#if list === null}
     <div class="px-8 py-8 mx-auto my-4 text-lg text-center bg-white rounded-lg shadow-lg lg:text-left lg:pl-20 dark:bg-slate-800 ring-1 ring-slate-900/5 text-slate-700 dark:text-slate-200">

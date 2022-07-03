@@ -62,6 +62,15 @@
         <IconContainer {title} {size}>
             <path stroke-linecap="round" stroke-linejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
         </IconContainer>
+    {:else if icon == 'data'}
+        <!--
+            heroicons.com
+            Copyright (c) 2020 Refactoring UI Inc
+            Licensed under MIT license: https://github.com/tailwindlabs/heroicons/blob/master/LICENSE
+        -->
+        <IconContainer {title} {size}>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
+        </IconContainer>
     {/if}
 </i>
 

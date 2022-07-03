@@ -34,6 +34,14 @@
                         <b class="text-slate-900 dark:text-white">{format(item.date * 1000, 'PPpp')}</b>
                     </span>
                 </span>
+                <span class="flex flex-row items-center text-sm">
+                    <span class="flex-grow-0 w-6 pr-2">
+                        <Icon icon="data" title="Request ID" size={'4'} />
+                    </span>
+                    <span class="flex-grow font-mono">
+                        {item.state}
+                    </span>
+                </span>
             </div>
             {#await submitting}
                 <p>Working on it...</p>
