@@ -124,8 +124,6 @@ function Subscribe(): () => void {
                 const gen = ndjson<pendingRequestItem>(res.body.getReader())
                 while (true) { // eslint-disable-line no-constant-condition
                     const {done, value} = await gen.next()
-                    console.log(done, value)
-                    // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
                     if (done) {
                         break
                     }

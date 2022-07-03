@@ -101,7 +101,10 @@ module.exports = {
 
         // Generate a service worker in prod
         ...(prod ? [
-            new GenerateSW({})
+            new GenerateSW({
+                exclude: [/LICENSE\.txt^/],
+                swDest: 'sw.js',
+            })
         ] : []),
 
         // Include the bundle analyzer only when mode is "analyze"
