@@ -14,6 +14,7 @@ on:
 env:
   GO_VERSION: "^1.18"
   CGO_ENABLED: "0"
+  NODE_VERSION: "16"
   # Username for Docker Hub-set to empty to disable pushing to Docker Hub
   DOCKERHUB_USERNAME: "italypaleale"
 
@@ -30,6 +31,10 @@ jobs:
       - uses: actions/setup-go@v3
         with:
           go-version: ${{ env.GO_VERSION }}
+
+      - uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Set variables
         run: |
@@ -89,8 +94,14 @@ jobs:
         run: |
           mkdir -p .bin .out
 
-          echo -e "\n###\nFetching modules\n"
+          echo -e "\n###\nFetching NPM dependencies\n"
+          (cd client; npm ci)
+
+          echo -e "\n###\nFetching Go modules\n"
           go get -v
+
+          echo -e "\n###\nRunning 'go generate'\n"
+          go generate -v ./...
 
           echo -e "\n###\nSetting BUILD_LDFLAGS\n"
           BUILDINFO_PKG="github.com/${{ github.repository_owner }}/unlocker/buildinfo"
