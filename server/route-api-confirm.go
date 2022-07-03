@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -118,6 +119,13 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestSta
 	}
 	if err != nil {
 		_ = c.Error(err)
+		if kvErr, ok := err.(*keyvault.KeyVaultError); ok {
+			// If the error comes from Key Vault, we need to cancel the request
+			s.cancelRequest(stateId, state)
+			errStr := fmt.Sprintf("Azure Key Vault returned an error: %s (%s)", kvErr.Err.Message, kvErr.Err.Code)
+			c.AbortWithStatusJSON(http.StatusConflict, ErrorResponse(errStr))
+			return
+		}
 		c.AbortWithStatusJSON(http.StatusInternalServerError, InternalServerError)
 		return
 	}
@@ -148,17 +156,22 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestSta
 
 // Handle cancellation of operations
 func (s *Server) handleCancel(c *gin.Context, stateId string, state *requestState) {
-	// Re-acquire a lock before modifying the state object and sending a notification
-	s.lock.Lock()
-	defer s.lock.Unlock()
-
-	// Mark the request as canceled and remove the input and access token
-	state.Input = nil
-	state.Status = StatusCanceled
+	s.cancelRequest(stateId, state)
 
 	// Response
 	c.Set("log-message", "Operation canceled: "+stateId)
 	c.JSON(http.StatusOK, map[string]bool{"canceled": true})
+}
+
+// Marks a request as canceled and sends a notification to the subscribers
+func (s *Server) cancelRequest(stateId string, state *requestState) {
+	// Re-acquire a lock before modifying the state object and sending a notification
+	s.lock.Lock()
+	defer s.lock.Unlock()
+
+	// Mark the request as canceled and remove the input
+	state.Input = nil
+	state.Status = StatusCanceled
 
 	// Send a notification to the subscriber if any
 	s.notifySubscriber(stateId, state)

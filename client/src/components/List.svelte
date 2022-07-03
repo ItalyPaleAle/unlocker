@@ -14,8 +14,10 @@
                 <PendingItem {item} />
             </div>
         {:else}
-            <p>There's no request pending your action at this time.</p>
-            <p class="text-sm">Need help getting started? Check out the <a href="https://github.com/italypaleale/unlocker#apis" class="underline hover:text-slate-900 hover:dark:text-white">documentation</a> for the APIs.</p>
+            <div class="px-4 py-5 mx-auto my-4 bg-white rounded-lg shadow-lg dark:bg-slate-800 ring-1 ring-slate-900/5 text-slate-700 dark:text-slate-200">
+                <p>There's no request pending your action at this time.</p>
+                <p class="text-sm">Need help getting started? Check out the <a href="https://github.com/italypaleale/unlocker#apis" class="underline hover:text-slate-900 hover:dark:text-white">documentation</a> for the APIs.</p>
+            </div>
         {/each}
     </div>
 {/if}

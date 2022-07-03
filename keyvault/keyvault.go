@@ -55,7 +55,7 @@ func (c *Client) GetKeyLastVersion(vault, keyId string) (string, error) {
 		return "", err
 	}
 	if res.StatusCode != 200 {
-		resError := &keyVaultError{}
+		resError := &KeyVaultError{}
 		if json.Unmarshal(resBody, resError) != nil {
 			// Body cannot be unmarshalled into keyVaultError
 			return "", errors.New("response error: " + string(resBody))
@@ -141,12 +141,12 @@ func (c *Client) doWrapUnwrap(reqUrl string, key []byte) ([]byte, error) {
 		return nil, err
 	}
 	if res.StatusCode != 200 {
-		resError := &keyVaultError{}
-		if json.Unmarshal(resBody, resError) != nil {
+		kvErr := &KeyVaultError{}
+		if json.Unmarshal(resBody, kvErr) != nil || kvErr.Err.Code == "" {
 			// Body cannot be unmarshalled into keyVaultError
 			return nil, errors.New("response error: " + string(resBody))
 		}
-		return nil, errors.New(resError.String())
+		return nil, kvErr
 	}
 	resData := &keyOperationResult{}
 	err = json.Unmarshal(resBody, resData)
@@ -174,15 +174,24 @@ type keyOperationResult struct {
 }
 
 // Type of error responses
-type keyVaultError struct {
-	Message    string `json:"message"`
-	Code       string `json:"code"`
-	InnerError struct {
-		Error string `json:"error"`
-	} `json:"innererror"`
+type KeyVaultError struct {
+	Err struct {
+		Message    string         `json:"message"`
+		Code       string         `json:"code"`
+		InnerError *KeyVaultError `json:"innererror"`
+	} `json:"error"`
 }
 
 // String representation
-func (e *keyVaultError) String() string {
-	return fmt.Sprintf("error from Key Vault: %s (%s)\nDetails: %s", e.Message, e.Code, e.InnerError.Error)
+func (e *KeyVaultError) String() string {
+	var details string
+	if e.Err.InnerError != nil {
+		details = fmt.Sprintf("\ndetails='%v'", e.Err.InnerError)
+	}
+	return fmt.Sprintf("error from Key Vault (code='%s') error='%s'%s", e.Err.Code, e.Err.Message, details)
+}
+
+// Error implements the error interface
+func (e *KeyVaultError) Error() string {
+	return e.String()
 }

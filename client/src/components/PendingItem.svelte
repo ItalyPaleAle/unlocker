@@ -1,6 +1,6 @@
 <div class="my-2">
     {#if error}
-        <p class="p-2 border rounded-sm bg-rose-50 dark:bg-rose-800 text-rose-800 dark:text-white border-rose-700 dark:border-rose-900">Error: {error}</p>
+        <p class="p-2 border rounded-sm bg-rose-50 dark:bg-rose-800 text-rose-800 dark:text-white border-rose-700 dark:border-rose-900">{error}</p>
     {/if}
     <div class="flex flex-row">
         <div class="flex-none pt-2 mr-4 w-14 h-14 text-slate-700 dark:text-slate-300">
@@ -44,6 +44,8 @@
                     <p>Request confirmed</p>
                 {:else if item.status === pendingRequestStatus.pendingRequestCanceled}
                     <p>Request canceled</p>
+                {:else if item.status === pendingRequestStatus.pendingRequestFailed_Client}
+                    <p>Request failed</p>
                 {:else if item.status === pendingRequestStatus.pendingRequestProcessing_Client}
                     <p><LoadingSpinner /> Working on it…</p>
                 {:else}
@@ -127,6 +129,7 @@ function submit(confirm: boolean) {
         .catch((err) => {
             // eslint-disable-next-line
             error = (err && typeof err.toString == 'function') ? err.toString() : ''
+            item.status = pendingRequestStatus.pendingRequestFailed_Client
         })
 }
 </script>

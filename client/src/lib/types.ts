@@ -9,7 +9,10 @@ export enum pendingRequestStatus {
     pendingRequestRemoved = 'removed',
     // Request is being processed
     // (Used in the client only)
-    pendingRequestProcessing_Client = '_client_processing'
+    pendingRequestProcessing_Client = '_client_processing',
+    // Request failed
+    // (Used in the client only)
+    pendingRequestFailed_Client = '_client_failed',
 }
 
 export type pendingRequestItem = {
