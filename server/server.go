@@ -106,6 +106,7 @@ func (s *Server) Init(log *utils.AppLogger) error {
 	}
 
 	// Add routes
+	s.router.GET("/healthz", s.RouteHealthz)
 	s.router.POST("/wrap", allowIpMw, s.RouteWrapUnwrap(OperationWrap))
 	s.router.POST("/unwrap", allowIpMw, s.RouteWrapUnwrap(OperationUnwrap))
 	s.router.GET("/result/:state", allowIpMw, s.RouteResult)
