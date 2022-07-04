@@ -102,7 +102,7 @@ module.exports = {
         // Generate a service worker in prod
         ...(prod ? [
             new GenerateSW({
-                exclude: [/LICENSE\.txt^/],
+                exclude: [/\.map$/, /^manifest.*\.js$/, /LICENSE\.txt$/],
                 swDest: 'sw.js',
             })
         ] : []),
