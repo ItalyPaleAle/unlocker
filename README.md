@@ -450,12 +450,6 @@ az ad app permission add \
   --api cfa8b339-82a2-471a-a3c9-0fc0be7a4093 \
   --api-permissions f53da476-18e3-4152-8e01-aec403e6edc0=Scope
 
-# Create a Service Principal from the app
-az ad sp create \
-  --id $APP_ID
-SP_OBJECT_ID=$(az ad sp show --id $APP_ID \
-  | jq -r .objectId)
-
 # Add the client secret
 az ad app credential reset \
   --id $APP_ID \
@@ -470,11 +464,4 @@ Take note of the output of the last command, which includes the values for the `
 - `password` is the value for `azureClientSecret`
 - `tenant` is the value for `azureTenantId`
 
-Allow the application to perform operations with keys stored on the Key Vault:
-
-```sh
-az role assignment create \
-  --assignee "${SP_OBJECT_ID}" \
-  --role "Key Vault Crypto User" \
-  --scope "${RG_ID}/providers/Microsoft.KeyVault/vaults/${KEYVAULT_NAME}"
-```
+> Note that the Azure AD application does not need permissions on the Key Vault. Instead, Unlocker uses delegated permissions, matching whatever access level the authenticated user has.
