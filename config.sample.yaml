@@ -5,7 +5,7 @@ azureClientSecret: ""
 azureTenantId: ""
 
 # Format for the webhook request
-# Supported values are "plain" (default) or "slack"
+# Supported values: "plain" (default), "slack", "discord"
 webhookFormat: "plain"
 
 # URL of the webhook to send notifications to

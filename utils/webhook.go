@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -27,12 +28,19 @@ func (w *Webhook) Init() {
 // SendWebhook sends the notification
 func (w *Webhook) SendWebhook(data *WebhookRequest) (err error) {
 	var req *http.Request
+	webhookUrl := viper.GetString("webhookUrl")
 	switch strings.ToLower(viper.GetString("webhookFormat")) {
 	case "slack":
-		req, err = w.prepareSlackRequest(data)
+		req, err = w.prepareSlackRequest(webhookUrl, data)
+	case "discord":
+		// Shorthand for using Slack-compatible webhooks with Discord
+		if !strings.HasSuffix(webhookUrl, "/slack") {
+			webhookUrl += "/slack"
+		}
+		req, err = w.prepareSlackRequest(webhookUrl, data)
 	//case "plain":
 	default:
-		req, err = w.preparePlainRequest(data)
+		req, err = w.preparePlainRequest(webhookUrl, data)
 	}
 	if err != nil {
 		return err
@@ -43,6 +51,8 @@ func (w *Webhook) SendWebhook(data *WebhookRequest) (err error) {
 		return err
 	}
 	defer res.Body.Close()
+	// Drain
+	_, _ = io.Copy(io.Discard, res.Body)
 	if res.StatusCode < 200 || res.StatusCode > 299 {
 		return fmt.Errorf("invalid response status code: %d", res.StatusCode)
 	}
@@ -53,7 +63,7 @@ func (w *Webhook) getLink(data *WebhookRequest) string {
 	return viper.GetString("baseUrl")
 }
 
-func (w *Webhook) preparePlainRequest(data *WebhookRequest) (req *http.Request, err error) {
+func (w *Webhook) preparePlainRequest(webhookUrl string, data *WebhookRequest) (req *http.Request, err error) {
 	// Format the message
 	message := fmt.Sprintf(
 		"Received a request to %s a key using key **%s** in vault **%s**.\n\n[Confirm request](%s)\n\n(Request ID: %s - Client IP: %s)",
@@ -66,7 +76,7 @@ func (w *Webhook) preparePlainRequest(data *WebhookRequest) (req *http.Request, 
 	)
 
 	// Create the request
-	req, err = http.NewRequest("POST", viper.GetString("webhookUrl"), strings.NewReader(message))
+	req, err = http.NewRequest("POST", webhookUrl, strings.NewReader(message))
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +90,7 @@ func (w *Webhook) preparePlainRequest(data *WebhookRequest) (req *http.Request, 
 	return req, nil
 }
 
-func (w *Webhook) prepareSlackRequest(data *WebhookRequest) (req *http.Request, err error) {
+func (w *Webhook) prepareSlackRequest(webhookUrl string, data *WebhookRequest) (req *http.Request, err error) {
 	// Format the message
 	message := fmt.Sprintf(
 		"Received a request to %s a key using key **%s** in vault **%s**.\n[Confirm request](%s)\n`(Request ID: %s - Client IP: %s)`",
@@ -104,7 +114,7 @@ func (w *Webhook) prepareSlackRequest(data *WebhookRequest) (req *http.Request, 
 	}
 
 	// Create the request
-	req, err = http.NewRequest("POST", viper.GetString("webhookUrl"), buf)
+	req, err = http.NewRequest("POST", webhookUrl, buf)
 	if err != nil {
 		return nil, err
 	}

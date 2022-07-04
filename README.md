@@ -57,9 +57,10 @@ All configuration options:
   Endpoint of the webhook, where notifications are sent to.  
   Environmental variable name: `UNLOCKER_WEBHOOKURL`
 - **`webhookFormat`** (optional, default: `plain`):  
-  The format for the webhook. Currently these two are supported:
+  The format for the webhook. Currently these are supported:
   - `plain` (default): sends a webhook with content type `text/plain`, where the request's body is the entire message.
-  - `slack`: sends a Slack-compatible message (can be used with Discord too)  
+  - `slack`: for usage with Slack or Slack-compatible endpoints
+  - `discord`: for usage with Discord (sends Slack-compatible messages)  
   Environmental variable name: `UNLOCKER_WEBHOOKFORMAT`
 - **`webhookKey`** (optional):  
   Value for the Authorization header send with the webhook request. Set this if your webhook requires it.  
