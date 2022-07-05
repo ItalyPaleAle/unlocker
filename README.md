@@ -132,18 +132,20 @@ Place the configuration for Unlocker in the `/etc/unlocker` folder, including th
 
 You will need to start Unlocker as a service using the process manager for your system. For modern Linux distributions based on **systemd**, you can use this unit. Copy this file to `/etc/systemd/system/unlocker.service`:
 
-```systemd
+```conf
 [Unit]
 Description=Unlocker service
-StartLimitInterval=200
-StartLimitBurst=5
 Wants=network-online.target
 After=network-online.target
 
 [Service]
 Type=simple
+# Specify the user and group to run Unlocker as
+User=daemon
+Group=daemon
 Restart=always
 RestartSec=30
+# Path where unlocker is installed
 ExecStart=/usr/local/bin/unlocker
 
 [Install]
