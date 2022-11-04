@@ -307,7 +307,7 @@ jobs:
 
       - name: Docker build and push to Docker Hub - edge
         uses: docker/build-push-action@v2
-        if: env.BUILD_VERSION == 'edge && env.DOCKERHUB_USERNAME != ''
+        if: env.BUILD_VERSION == 'edge' && env.DOCKERHUB_USERNAME != ''
         with:
           context: .
           file: ./Dockerfile
@@ -331,7 +331,7 @@ jobs:
 
       - name: Docker build and push to Docker Hub - release
         uses: docker/build-push-action@v2
-        if: env.BUILD_VERSION != 'edge && env.DOCKERHUB_USERNAME != ''
+        if: env.BUILD_VERSION != 'edge' && env.DOCKERHUB_USERNAME != ''
         with:
           context: .
           file: ./Dockerfile
