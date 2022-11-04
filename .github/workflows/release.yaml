@@ -12,7 +12,7 @@ on:
       - 'v*'
 
 env:
-  GO_VERSION: "^1.18"
+  GO_VERSION: "^1.19"
   CGO_ENABLED: "0"
   NODE_VERSION: "16"
   # Username for Docker Hub-set to empty to disable pushing to Docker Hub
