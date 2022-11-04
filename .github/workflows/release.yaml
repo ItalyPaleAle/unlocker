@@ -294,7 +294,7 @@ jobs:
           echo "REPO_OWNER=${REPO_OWNER,,}" >>${GITHUB_ENV}
 
       - name: Docker build and push to GHCR - edge
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         if: env.BUILD_VERSION == 'edge'
         with:
           context: .
@@ -306,7 +306,7 @@ jobs:
           push: true
 
       - name: Docker build and push to Docker Hub - edge
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         if: env.BUILD_VERSION == 'edge' && env.DOCKERHUB_USERNAME != ''
         with:
           context: .
@@ -318,7 +318,7 @@ jobs:
           push: true
 
       - name: Docker build and push to GHCR - release
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         if: env.BUILD_VERSION != 'edge'
         with:
           context: .
@@ -330,7 +330,7 @@ jobs:
           push: true
 
       - name: Docker build and push to Docker Hub - release
-        uses: docker/build-push-action@v2
+        uses: docker/build-push-action@v3
         if: env.BUILD_VERSION != 'edge' && env.DOCKERHUB_USERNAME != ''
         with:
           context: .
