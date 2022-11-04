@@ -46,6 +46,11 @@ jobs:
           chmod +x .bin/semver
 
           if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            BUILD_ID="edge"
+            BUILD_VERSION="edge"
+            BRANCH=""
+            PRERELEASE=""
+          else
             # Trim the first 10 characters, which are "refs/tags/"
             BUILD_ID="${GITHUB_REF:10}"
             # Just like BUILD_ID, but without the "v" at the beginning
@@ -64,11 +69,6 @@ jobs:
             if [ "$PRERELEASE" != "" ]; then
               BRANCH="${BRANCH}-pre"
             fi
-          else
-            BUILD_ID="edge"
-            BUILD_VERSION="edge"
-            BRANCH=""
-            PRERELEASE=""
           fi
 
           BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%S')
