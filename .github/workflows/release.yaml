@@ -122,78 +122,78 @@ jobs:
           echo "BUILD_LDFLAGS=${BUILD_LDFLAGS}"
 
           echo -e "\n###\nBuilding linux/amd64\n"
-          mkdir .bin/unlocker-v${{env.BUILD_VERSION}}-linux-amd64
+          mkdir .bin/unlocker-${{ env.BUILD_ID }}-linux-amd64
           GOOS=linux \
           GOARCH=amd64 \
             go build \
               -ldflags "${BUILD_LDFLAGS}" \
-              -o .bin/unlocker-v${{env.BUILD_VERSION}}-linux-amd64/unlocker
-          cp LICENSE.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-amd64
-          cp README.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-amd64
-          (cd .bin && tar -czvf ../.out/unlocker-v${{env.BUILD_VERSION}}-linux-amd64.tar.gz unlocker-v${{env.BUILD_VERSION}}-linux-amd64)
+              -o .bin/unlocker-${{ env.BUILD_ID }}-linux-amd64/unlocker
+          cp LICENSE.md .bin/unlocker-${{ env.BUILD_ID }}-linux-amd64
+          cp README.md .bin/unlocker-${{ env.BUILD_ID }}-linux-amd64
+          (cd .bin && tar -czvf ../.out/unlocker-${{ env.BUILD_ID }}-linux-amd64.tar.gz unlocker-${{ env.BUILD_ID }}-linux-amd64)
 
           echo -e "\n###\nBuilding linux/386\n"
-          mkdir .bin/unlocker-v${{env.BUILD_VERSION}}-linux-386
+          mkdir .bin/unlocker-${{ env.BUILD_ID }}-linux-386
           GOOS=linux \
           GOARCH=386 \
             go build \
               -ldflags "${BUILD_LDFLAGS}" \
-              -o .bin/unlocker-v${{env.BUILD_VERSION}}-linux-386/unlocker
-          cp LICENSE.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-386
-          cp README.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-386
-          (cd .bin && tar -czvf ../.out/unlocker-v${{env.BUILD_VERSION}}-linux-386.tar.gz unlocker-v${{env.BUILD_VERSION}}-linux-386)
+              -o .bin/unlocker-${{ env.BUILD_ID }}-linux-386/unlocker
+          cp LICENSE.md .bin/unlocker-${{ env.BUILD_ID }}-linux-386
+          cp README.md .bin/unlocker-${{ env.BUILD_ID }}-linux-386
+          (cd .bin && tar -czvf ../.out/unlocker-${{ env.BUILD_ID }}-linux-386.tar.gz unlocker-${{ env.BUILD_ID }}-linux-386)
 
           echo -e "\n###\nBuilding linux/arm64\n"
-          mkdir .bin/unlocker-v${{env.BUILD_VERSION}}-linux-arm64
+          mkdir .bin/unlocker-${{ env.BUILD_ID }}-linux-arm64
           GOOS=linux \
           GOARCH=arm64 \
             go build \
               -ldflags "${BUILD_LDFLAGS}" \
-              -o .bin/unlocker-v${{env.BUILD_VERSION}}-linux-arm64/unlocker
-          cp LICENSE.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-arm64
-          cp README.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-arm64
-          (cd .bin && tar -czvf ../.out/unlocker-v${{env.BUILD_VERSION}}-linux-arm64.tar.gz unlocker-v${{env.BUILD_VERSION}}-linux-arm64)
+              -o .bin/unlocker-${{ env.BUILD_ID }}-linux-arm64/unlocker
+          cp LICENSE.md .bin/unlocker-${{ env.BUILD_ID }}-linux-arm64
+          cp README.md .bin/unlocker-${{ env.BUILD_ID }}-linux-arm64
+          (cd .bin && tar -czvf ../.out/unlocker-${{ env.BUILD_ID }}-linux-arm64.tar.gz unlocker-${{ env.BUILD_ID }}-linux-arm64)
 
           echo -e "\n###\nBuilding linux/armv7\n"
-          mkdir .bin/unlocker-v${{env.BUILD_VERSION}}-linux-armv7
+          mkdir .bin/unlocker-${{ env.BUILD_ID }}-linux-armv7
           GOOS=linux \
           GOARCH=arm \
           GOARM=7 \
             go build \
               -ldflags "${BUILD_LDFLAGS}" \
-              -o .bin/unlocker-v${{env.BUILD_VERSION}}-linux-armv7/unlocker
-          cp LICENSE.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-armv7
-          cp README.md .bin/unlocker-v${{env.BUILD_VERSION}}-linux-armv7
-          (cd .bin && tar -czvf ../.out/unlocker-v${{env.BUILD_VERSION}}-linux-armv7.tar.gz unlocker-v${{env.BUILD_VERSION}}-linux-armv7)
+              -o .bin/unlocker-${{ env.BUILD_ID }}-linux-armv7/unlocker
+          cp LICENSE.md .bin/unlocker-${{ env.BUILD_ID }}-linux-armv7
+          cp README.md .bin/unlocker-${{ env.BUILD_ID }}-linux-armv7
+          (cd .bin && tar -czvf ../.out/unlocker-${{ env.BUILD_ID }}-linux-armv7.tar.gz unlocker-${{ env.BUILD_ID }}-linux-armv7)
 
           echo -e "\n###\nBuilding darwin/amd64\n"
-          mkdir .bin/unlocker-v${{env.BUILD_VERSION}}-macos
+          mkdir .bin/unlocker-${{ env.BUILD_ID }}-macos
           GOOS=darwin \
           GOARCH=amd64 \
             go build \
               -ldflags "${BUILD_LDFLAGS}" \
-              -o .bin/unlocker-v${{env.BUILD_VERSION}}-macos-x64/unlocker
-          cp LICENSE.md .bin/unlocker-v${{env.BUILD_VERSION}}-macos-x64
-          cp README.md .bin/unlocker-v${{env.BUILD_VERSION}}-macos-x64
-          (cd .bin && tar -czvf ../.out/unlocker-v${{env.BUILD_VERSION}}-macos-x64.tar.gz unlocker-v${{env.BUILD_VERSION}}-macos-x64)
+              -o .bin/unlocker-${{ env.BUILD_ID }}-macos-x64/unlocker
+          cp LICENSE.md .bin/unlocker-${{ env.BUILD_ID }}-macos-x64
+          cp README.md .bin/unlocker-${{ env.BUILD_ID }}-macos-x64
+          (cd .bin && tar -czvf ../.out/unlocker-${{ env.BUILD_ID }}-macos-x64.tar.gz unlocker-${{ env.BUILD_ID }}-macos-x64)
 
           echo -e "\n###\nBuilding darwin/arm64\n"
-          mkdir .bin/unlocker-v${{env.BUILD_VERSION}}-macos-arm64
+          mkdir .bin/unlocker-${{ env.BUILD_ID }}-macos-arm64
           GOOS=darwin \
           GOARCH=arm64 \
             go build \
               -ldflags "${BUILD_LDFLAGS}" \
-              -o .bin/unlocker-v${{env.BUILD_VERSION}}-macos-arm64/unlocker
-          cp LICENSE.md .bin/unlocker-v${{env.BUILD_VERSION}}-macos-arm64
-          cp README.md .bin/unlocker-v${{env.BUILD_VERSION}}-macos-arm64
-          (cd .bin && tar -czvf ../.out/unlocker-v${{env.BUILD_VERSION}}-macos-arm64.tar.gz unlocker-v${{env.BUILD_VERSION}}-macos-arm64)
+              -o .bin/unlocker-${{ env.BUILD_ID }}-macos-arm64/unlocker
+          cp LICENSE.md .bin/unlocker-${{ env.BUILD_ID }}-macos-arm64
+          cp README.md .bin/unlocker-${{ env.BUILD_ID }}-macos-arm64
+          (cd .bin && tar -czvf ../.out/unlocker-${{ env.BUILD_ID }}-macos-arm64.tar.gz unlocker-${{ env.BUILD_ID }}-macos-arm64)
 
           echo -e "\n###\nLinks for Docker buildx\n"
           (
             cd .bin && \
-            ln -v -s unlocker-v${{env.BUILD_VERSION}}-linux-amd64 linux-amd64 && \
-            ln -v -s unlocker-v${{env.BUILD_VERSION}}-linux-arm64 linux-arm64 && \
-            ln -v -s unlocker-v${{env.BUILD_VERSION}}-linux-armv7 linux-arm \
+            ln -v -s unlocker-${{ env.BUILD_ID }}-linux-amd64 linux-amd64 && \
+            ln -v -s unlocker-${{ env.BUILD_ID }}-linux-arm64 linux-arm64 && \
+            ln -v -s unlocker-${{ env.BUILD_ID }}-linux-armv7 linux-arm \
           )
 
           echo -e "\n###\nCompilation done\n"
@@ -227,8 +227,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: .out/unlocker-v${{env.BUILD_VERSION}}-linux-amd64.tar.gz
-          asset_name: unlocker-v${{env.BUILD_VERSION}}-linux-amd64.tar.gz
+          asset_path: .out/unlocker-${{ env.BUILD_ID }}-linux-amd64.tar.gz
+          asset_name: unlocker-${{ env.BUILD_ID }}-linux-amd64.tar.gz
           asset_content_type: application/gzip
 
       - name: Upload release asset unlocker-linux-386
@@ -238,8 +238,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: .out/unlocker-v${{env.BUILD_VERSION}}-linux-386.tar.gz
-          asset_name: unlocker-v${{env.BUILD_VERSION}}-linux-386.tar.gz
+          asset_path: .out/unlocker-${{ env.BUILD_ID }}-linux-386.tar.gz
+          asset_name: unlocker-${{ env.BUILD_ID }}-linux-386.tar.gz
           asset_content_type: application/gzip
 
       - name: Upload release asset unlocker-linux-arm64
@@ -249,8 +249,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: .out/unlocker-v${{env.BUILD_VERSION}}-linux-arm64.tar.gz
-          asset_name: unlocker-v${{env.BUILD_VERSION}}-linux-arm64.tar.gz
+          asset_path: .out/unlocker-${{ env.BUILD_ID }}-linux-arm64.tar.gz
+          asset_name: unlocker-${{ env.BUILD_ID }}-linux-arm64.tar.gz
           asset_content_type: application/gzip
 
       - name: Upload release asset unlocker-linux-armv7
@@ -260,8 +260,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: .out/unlocker-v${{env.BUILD_VERSION}}-linux-armv7.tar.gz
-          asset_name: unlocker-v${{env.BUILD_VERSION}}-linux-armv7.tar.gz
+          asset_path: .out/unlocker-${{ env.BUILD_ID }}-linux-armv7.tar.gz
+          asset_name: unlocker-${{ env.BUILD_ID }}-linux-armv7.tar.gz
           asset_content_type: application/gzip
 
       - name: Upload release asset unlocker-macos-x64
@@ -271,8 +271,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: .out/unlocker-v${{env.BUILD_VERSION}}-macos-x64.tar.gz
-          asset_name: unlocker-v${{env.BUILD_VERSION}}-macos-x64.tar.gz
+          asset_path: .out/unlocker-${{ env.BUILD_ID }}-macos-x64.tar.gz
+          asset_name: unlocker-${{ env.BUILD_ID }}-macos-x64.tar.gz
           asset_content_type: application/gzip
 
       - name: Upload release asset unlocker-macos-arm64
@@ -282,8 +282,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: .out/unlocker-v${{env.BUILD_VERSION}}-macos-arm64.tar.gz
-          asset_name: unlocker-v${{env.BUILD_VERSION}}-macos-arm64.tar.gz
+          asset_path: .out/unlocker-${{ env.BUILD_ID }}-macos-arm64.tar.gz
+          asset_name: unlocker-${{ env.BUILD_ID }}-macos-arm64.tar.gz
           asset_content_type: application/gzip
 
       - name: Set variable REPO_OWNER
