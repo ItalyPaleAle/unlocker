@@ -1,12 +1,14 @@
-# Creates a release for the application
+# Builds the application and makes releases
 #
 # Required secrets:
 # - DOCKERHUB_TOKEN: Token for publishing to Docker Hub (optional)
 
-name: Release
+name: Build and release
 
 on:
   push:
+    branches:
+      - main
     tags:
       # Push to tags matching v*
       - 'v*'
@@ -14,7 +16,7 @@ on:
 env:
   GO_VERSION: "^1.19"
   CGO_ENABLED: "0"
-  NODE_VERSION: "16"
+  NODE_VERSION: "18"
   # Username for Docker Hub-set to empty to disable pushing to Docker Hub
   DOCKERHUB_USERNAME: "italypaleale"
 
@@ -22,7 +24,7 @@ jobs:
 
   build:
     name: Build
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     steps:
 
       - name: Check out code
@@ -43,52 +45,66 @@ jobs:
           curl https://raw.githubusercontent.com/fsaintjacques/semver-tool/3.3.0/src/semver > .bin/semver
           chmod +x .bin/semver
 
-          # Trim the first 10 characters, which are "refs/tags/"
-          BUILD_ID="${GITHUB_REF:10}"
-          # Just like BUILD_ID, but without the "v" at the beginning
-          BUILD_VERSION="${GITHUB_REF:11}"
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            # Trim the first 10 characters, which are "refs/tags/"
+            BUILD_ID="${GITHUB_REF:10}"
+            # Just like BUILD_ID, but without the "v" at the beginning
+            BUILD_VERSION="${GITHUB_REF:11}"
+
+            # Branch
+            MAJOR_VERSION=$(.bin/semver get major $BUILD_VERSION)
+            MINOR_VERSION=$(.bin/semver get minor $BUILD_VERSION)
+            PRERELEASE=$(.bin/semver get prerel $BUILD_VERSION)
+            BRANCH=""
+            if [ "$MAJOR_VERSION" = "0" ]; then
+              BRANCH="$MAJOR_VERSION.$MINOR_VERSION"
+            else
+              BRANCH="$MAJOR_VERSION"
+            fi
+            if [ "$PRERELEASE" != "" ]; then
+              BRANCH="${BRANCH}-pre"
+            fi
+          else
+            BUILD_ID="edge"
+            BUILD_VERSION="edge"
+            BRANCH=""
+            PRERELEASE=""
+          fi
+
           BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%S')
           COMMIT_HASH=$(echo $GITHUB_SHA | head -c 7)
+
           echo "BUILD_ID=$BUILD_ID" >> $GITHUB_ENV
           echo "BUILD_VERSION=$BUILD_VERSION" >> $GITHUB_ENV
           echo "BUILD_DATE=$BUILD_DATE" >> $GITHUB_ENV
           echo "COMMIT_HASH=$COMMIT_HASH" >> $GITHUB_ENV
-
-          # Branch
-          MAJOR_VERSION=$(.bin/semver get major $BUILD_VERSION)
-          MINOR_VERSION=$(.bin/semver get minor $BUILD_VERSION)
-          PRERELEASE=$(.bin/semver get prerel $BUILD_VERSION)
-          BRANCH=""
-          if [ "$MAJOR_VERSION" = "0" ]; then
-            BRANCH="$MAJOR_VERSION.$MINOR_VERSION"
-          else
-            BRANCH="$MAJOR_VERSION"
-          fi
-          if [ "$PRERELEASE" != "" ]; then
-            BRANCH="${BRANCH}-pre"
-          fi
           echo "BRANCH=$BRANCH" >> $GITHUB_ENV
           echo "PRERELEASE=$PRERELEASE" >> $GITHUB_ENV
 
       - name: Login to DockerHub
-        uses: docker/login-action@v1
+        uses: docker/login-action@v2
         if: env.DOCKERHUB_USERNAME != ''
         with:
           username: ${{ env.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Login to GitHub Container Registry
-        uses: docker/login-action@v1 
+        uses: docker/login-action@v2
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
+        uses: docker/setup-qemu-action@v2
+        with:
+          platforms: 'arm64,arm'
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v1
+        uses: docker/setup-buildx-action@v2
+        with:
+          version: latest
+          install: true
 
       - name: Build for all platforms
         run: |
@@ -96,9 +112,6 @@ jobs:
 
           echo -e "\n###\nFetching NPM dependencies\n"
           (cd client; npm ci)
-
-          echo -e "\n###\nFetching Go modules\n"
-          go get -v
 
           echo -e "\n###\nRunning 'go generate'\n"
           go generate -v ./...
@@ -198,6 +211,7 @@ jobs:
       - name: Create release
         id: create_release
         uses: actions/create-release@v1
+        if: env.BUILD_VERSION != 'edge'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -208,6 +222,7 @@ jobs:
 
       - name: Upload release asset unlocker-linux-amd64
         uses: actions/upload-release-asset@v1
+        if: env.BUILD_VERSION != 'edge'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -218,6 +233,7 @@ jobs:
 
       - name: Upload release asset unlocker-linux-386
         uses: actions/upload-release-asset@v1
+        if: env.BUILD_VERSION != 'edge'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -228,6 +244,7 @@ jobs:
 
       - name: Upload release asset unlocker-linux-arm64
         uses: actions/upload-release-asset@v1
+        if: env.BUILD_VERSION != 'edge'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -238,6 +255,7 @@ jobs:
 
       - name: Upload release asset unlocker-linux-armv7
         uses: actions/upload-release-asset@v1
+        if: env.BUILD_VERSION != 'edge'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -248,6 +266,7 @@ jobs:
 
       - name: Upload release asset unlocker-macos-x64
         uses: actions/upload-release-asset@v1
+        if: env.BUILD_VERSION != 'edge'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -258,6 +277,7 @@ jobs:
 
       - name: Upload release asset unlocker-macos-arm64
         uses: actions/upload-release-asset@v1
+        if: env.BUILD_VERSION != 'edge'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -273,8 +293,33 @@ jobs:
           REPO_OWNER=${{ github.repository_owner }}
           echo "REPO_OWNER=${REPO_OWNER,,}" >>${GITHUB_ENV}
 
-      - name: Docker build and push to GHCR
+      - name: Docker build and push to GHCR - edge
         uses: docker/build-push-action@v2
+        if: env.BUILD_VERSION == 'edge'
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          tags: |
+            ghcr.io/${{ env.REPO_OWNER }}/unlocker:edge
+            ghcr.io/${{ env.REPO_OWNER }}/unlocker:edge
+          push: true
+
+      - name: Docker build and push to Docker Hub - edge
+        uses: docker/build-push-action@v2
+        if: env.BUILD_VERSION == 'edge && env.DOCKERHUB_USERNAME != ''
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64,linux/arm/v7
+          tags: |
+            ${{ env.DOCKERHUB_USERNAME }}/unlocker:edge
+            ${{ env.DOCKERHUB_USERNAME }}/unlocker:edge
+          push: true
+
+      - name: Docker build and push to GHCR - release
+        uses: docker/build-push-action@v2
+        if: env.BUILD_VERSION != 'edge'
         with:
           context: .
           file: ./Dockerfile
@@ -284,9 +329,9 @@ jobs:
             ghcr.io/${{ env.REPO_OWNER }}/unlocker:${{env.BRANCH}}
           push: true
 
-      - name: Docker build and push to Docker Hub
+      - name: Docker build and push to Docker Hub - release
         uses: docker/build-push-action@v2
-        if: env.DOCKERHUB_USERNAME != ''
+        if: env.BUILD_VERSION != 'edge && env.DOCKERHUB_USERNAME != ''
         with:
           context: .
           file: ./Dockerfile
