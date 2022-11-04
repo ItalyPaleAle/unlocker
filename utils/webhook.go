@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -15,6 +16,7 @@ import (
 // Webhook client
 type Webhook struct {
 	httpClient *http.Client
+	log        *AppLogger
 }
 
 // Init the object
@@ -27,36 +29,63 @@ func (w *Webhook) Init() {
 
 // SendWebhook sends the notification
 func (w *Webhook) SendWebhook(data *WebhookRequest) (err error) {
-	var req *http.Request
 	webhookUrl := viper.GetString("webhookUrl")
-	switch strings.ToLower(viper.GetString("webhookFormat")) {
-	case "slack":
-		req, err = w.prepareSlackRequest(webhookUrl, data)
-	case "discord":
-		// Shorthand for using Slack-compatible webhooks with Discord
-		if !strings.HasSuffix(webhookUrl, "/slack") {
-			webhookUrl += "/slack"
+
+	// Retry up to 3 times
+	const attempts = 3
+	for i := 0; i < attempts; i++ {
+		var req *http.Request
+		switch strings.ToLower(viper.GetString("webhookFormat")) {
+		case "slack":
+			req, err = w.prepareSlackRequest(webhookUrl, data)
+		case "discord":
+			// Shorthand for using Slack-compatible webhooks with Discord
+			if !strings.HasSuffix(webhookUrl, "/slack") {
+				webhookUrl += "/slack"
+			}
+			req, err = w.prepareSlackRequest(webhookUrl, data)
+		//case "plain":
+		default:
+			req, err = w.preparePlainRequest(webhookUrl, data)
 		}
-		req, err = w.prepareSlackRequest(webhookUrl, data)
-	//case "plain":
-	default:
-		req, err = w.preparePlainRequest(webhookUrl, data)
-	}
-	if err != nil {
-		return err
+		if err != nil {
+			return err
+		}
+
+		res, err := w.httpClient.Do(req)
+		if err != nil {
+			// Retry after 15 seconds on network failures
+			w.log.Raw().Warn().
+				Err(err).
+				Msg("Network error sending webhook; will retry after 15 seconds")
+			time.Sleep(15 * time.Second)
+			continue
+		}
+
+		// Drain body before closing
+		_, _ = io.Copy(io.Discard, res.Body)
+		res.Body.Close()
+
+		// Handle throttling
+		if res.StatusCode == http.StatusTooManyRequests {
+			retryAfter, _ := strconv.Atoi(res.Header.Get("Retry-After"))
+			if retryAfter < 1 || retryAfter > 30 {
+				retryAfter = 30
+			}
+			w.log.Raw().Warn().
+				Msgf("Webhook throttled; will retry after %d seconds", retryAfter)
+			time.Sleep(time.Duration(retryAfter) * time.Second)
+			continue
+		}
+
+		// Any other error is permanent
+		if res.StatusCode < 200 || res.StatusCode > 299 {
+			return fmt.Errorf("invalid response status code: %d", res.StatusCode)
+		}
+		return nil
 	}
 
-	res, err := w.httpClient.Do(req)
-	if err != nil {
-		return err
-	}
-	defer res.Body.Close()
-	// Drain
-	_, _ = io.Copy(io.Discard, res.Body)
-	if res.StatusCode < 200 || res.StatusCode > 299 {
-		return fmt.Errorf("invalid response status code: %d", res.StatusCode)
-	}
-	return nil
+	return fmt.Errorf("failed to send webhook after %d attempts", attempts)
 }
 
 func (w *Webhook) getLink(data *WebhookRequest) string {

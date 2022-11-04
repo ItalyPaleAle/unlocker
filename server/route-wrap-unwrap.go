@@ -74,19 +74,21 @@ func (s *Server) RouteWrapUnwrap(op requestOperation) gin.HandlerFunc {
 		}
 		s.states[stateId] = state
 
-		// Invoke the webhook and send a message with the URL to unlock
-		err = s.webhook.SendWebhook(&utils.WebhookRequest{
-			OperationName: op.String(),
-			KeyId:         req.KeyId,
-			Vault:         req.Vault,
-			StateId:       stateId,
-			Requestor:     ip,
-		})
-		if err != nil {
-			_ = c.Error(err)
-			c.AbortWithStatusJSON(http.StatusInternalServerError, ErrorResponse("Error sending webhook"))
-			return
-		}
+		// Invoke the webhook and send a message with the URL to unlock, in background
+		go func() {
+			webhookErr := s.webhook.SendWebhook(&utils.WebhookRequest{
+				OperationName: op.String(),
+				KeyId:         req.KeyId,
+				Vault:         req.Vault,
+				StateId:       stateId,
+				Requestor:     ip,
+			})
+			if webhookErr != nil {
+				s.log.Raw().Error().
+					Err(webhookErr).
+					Msg("Fatal error sending webhook")
+			}
+		}()
 
 		// Make the request expire in background
 		go s.expireRequest(stateId, validity)
