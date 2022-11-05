@@ -50,7 +50,7 @@ func (s *Server) Init(log *utils.AppLogger) error {
 
 	// Init the webhook
 	s.webhook = &utils.Webhook{}
-	s.webhook.Init()
+	s.webhook.Init(log)
 
 	// Init a HTTP client
 	s.httpClient = &http.Client{

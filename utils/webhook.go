@@ -20,7 +20,9 @@ type Webhook struct {
 }
 
 // Init the object
-func (w *Webhook) Init() {
+func (w *Webhook) Init(log *AppLogger) {
+	w.log = log
+
 	// Init a HTTP client
 	w.httpClient = &http.Client{
 		Timeout: 15 * time.Second,
