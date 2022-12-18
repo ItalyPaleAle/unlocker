@@ -31,6 +31,9 @@ func (c *Client) Init(accessToken string) error {
 
 // KeyUrl returns the URL for a key in Azure Key Vault
 func (c *Client) KeyUrl(vault, keyId, keyVersion string) string {
+	if keyVersion == "" {
+		return fmt.Sprintf("https://%s.vault.azure.net/keys/%s", vault, keyId)
+	}
 	return fmt.Sprintf("https://%s.vault.azure.net/keys/%s/%s", vault, keyId, keyVersion)
 }
 

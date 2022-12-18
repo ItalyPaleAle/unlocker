@@ -110,20 +110,9 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestSta
 		return
 	}
 
-	// Check if we need to retrieve the key version
-	keyVersion := state.KeyVersion
-	if keyVersion == "" {
-		keyVersion, err = akv.GetKeyLastVersion(state.Vault, state.KeyId)
-		if err != nil {
-			_ = c.Error(err)
-			c.AbortWithStatusJSON(http.StatusInternalServerError, InternalServerError)
-			return
-		}
-	}
-
 	// Make the request
 	var output []byte
-	keyUrl := akv.KeyUrl(state.Vault, state.KeyId, keyVersion)
+	keyUrl := akv.KeyUrl(state.Vault, state.KeyId, state.KeyVersion)
 	if state.Operation == OperationWrap {
 		output, err = akv.WrapKey(keyUrl, state.Input)
 	} else if state.Operation == OperationUnwrap {
