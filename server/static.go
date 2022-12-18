@@ -1,7 +1,6 @@
 package server
 
 import (
-	"embed"
 	"errors"
 	"fmt"
 	"io"
@@ -14,16 +13,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
+
+	"github.com/italypaleale/unlocker/client"
 )
 
 //go:generate ../client/build.sh
-//go:generate rm -rvf static
-//go:generate cp -r ../client/dist static
 
-//go:embed static
-var staticFS embed.FS
-
-const staticBaseDir = "static"
+const staticBaseDir = "dist"
 
 func (s *Server) serveClient() func(c *gin.Context) {
 	// Option used during development to proxy to another server (such as a dev server)
@@ -36,7 +32,7 @@ func (s *Server) serveClient() func(c *gin.Context) {
 			}
 
 			// Serve the request from the embedded FS
-			serveStaticFiles(c, c.Request.URL.Path, staticFS)
+			serveStaticFiles(c, c.Request.URL.Path, client.StaticFS)
 		}
 	} else {
 		u, err := url.Parse(clientProxyServer)
