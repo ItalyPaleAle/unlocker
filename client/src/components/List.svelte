@@ -8,10 +8,32 @@
         <LoadingSpinner size="3rem" /> Loading…
     </div>
 {:else}
-    <div class="space-y-4">
+    <div class="pt-2 space-y-4">
+        {#if Object.keys(list).length > 1}
+            <div class="flex flex-row w-full mx-auto md:w-2/3">
+                <div role="button"
+                    class="flex flex-row items-center flex-auto p-2 m-2 rounded shadow-sm text-emerald-700 dark:text-emerald-400 hover:text-slate-900 hover:dark:text-white bg-slate-200 dark:bg-slate-700 border-emerald-300 dark:border-emerald-600 hover:bg-emerald-300 hover:dark:bg-emerald-600"
+                    on:click={() => SubmitAll(true)} on:keypress={() => SubmitAll(true)}
+                >
+                    <span class="pr-2 w-7">
+                        <Icon icon="check-circle" title="" size={'5'} /> 
+                    </span>
+                    <span>Confirm All</span>
+                </div>
+                <div role="button"
+                    class="flex flex-row items-center flex-auto p-2 m-2 rounded shadow-sm text-rose-700 dark:text-rose-400 hover:text-slate-900 hover:dark:text-white bg-slate-200 dark:bg-slate-700 border-rose-300 dark:border-rose-600 hover:bg-rose-300 hover:dark:bg-rose-600"
+                    on:click={() => SubmitAll(false)} on:keypress={() => SubmitAll(false)}
+                >
+                    <span class="pr-2 w-7">
+                        <Icon icon="x-circle" title="" size={'5'} /> 
+                    </span>
+                    <span>Cancel All</span>
+                </div>
+            </div>
+        {/if}
         {#each Object.entries(list) as [state, item] (state)}
             <div class="px-4 py-2 mx-auto my-4 bg-white rounded-lg shadow-lg dark:bg-slate-800 ring-1 ring-slate-900/5 text-slate-700 dark:text-slate-200">
-                <PendingItem {item} />
+                <PendingItem {item} bind:submit={item._submit} />
             </div>
         {:else}
             <div class="px-4 py-5 mx-auto my-4 bg-white rounded-lg shadow-lg dark:bg-slate-800 ring-1 ring-slate-900/5 text-slate-700 dark:text-slate-200">
@@ -26,15 +48,16 @@
 import LoadingSpinner from './LoadingSpinner.svelte'
 import PendingItem from './PendingItem.svelte'
 
+import ndjson from '../lib/ndjson'
 import {ThrowResponseNotOk, URLPrefix} from '../lib/request'
 import {pendingRequestStatus, type pendingRequestItem} from '../lib/types'
-import ndjson from '../lib/ndjson'
 
 import {createEventDispatcher, onDestroy, onMount} from 'svelte'
+import Icon from './Icon.svelte'
 
 const dispatch = createEventDispatcher()
 
-let list: Record<string, pendingRequestItem>|null = null
+let list: Record<string, pendingRequestItem&{_submit?:(confirm: boolean) => void}>|null = null
 let pageError: string|null = null
 let redirectTimeout = 0
 
@@ -160,5 +183,18 @@ function UpdateList(el: pendingRequestItem) {
 
 function RedirectToAuth() {
     window.location.href = URLPrefix + '/auth'
+}
+
+function SubmitAll(confirm: boolean) {
+    if (!list) {
+        return
+    }
+    for (const key in list) {
+        const submit = list[key]?._submit
+        if (!submit) {
+            continue
+        }
+        submit(confirm)
+    }
 }
 </script>

@@ -15,7 +15,7 @@ export enum pendingRequestStatus {
     pendingRequestFailed_Client = '_client_failed',
 }
 
-export type pendingRequestItem = {
+export interface pendingRequestItem {
     state: string
     status: pendingRequestStatus
     operation: string
