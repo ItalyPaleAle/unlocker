@@ -190,11 +190,14 @@ function SubmitAll(confirm: boolean) {
         return
     }
     for (const key in list) {
-        const submit = list[key]?._submit
-        if (!submit) {
+        const el = list[key]
+        if (!el) {
             continue
         }
-        submit(confirm)
+        if (!el._submit || el.status != pendingRequestStatus.pendingRequestPending) {
+            continue
+        }
+        el._submit(confirm)
     }
 }
 </script>
