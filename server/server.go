@@ -282,7 +282,7 @@ func (s *Server) subscribeToState(stateId string) chan *requestState {
 	}
 
 	// Create a new subscription
-	ch = make(chan *requestState)
+	ch = make(chan *requestState, 1)
 	s.subs[stateId] = ch
 	return ch
 }
