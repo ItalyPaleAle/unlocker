@@ -111,7 +111,7 @@ type keyRequest struct {
 	Note       string `json:"note" form:"note"`
 }
 
-var noteValidate = regexp.MustCompile(`[^A-Za-z0-9 ._-]`)
+var noteValidate = regexp.MustCompile(`[^A-Za-z0-9 .\/_-]`)
 
 func (req *keyRequest) Validate() error {
 	if req.Vault == "" {
@@ -124,10 +124,10 @@ func (req *keyRequest) Validate() error {
 		return errors.New("missing parameter 'value'")
 	}
 	if req.Note != "" && noteValidate.MatchString(req.Note) {
-		return errors.New("parameter 'note' contains invalid characters (only `A-Za-z0-9 ._-` are allowed)")
+		return errors.New("parameter 'note' contains invalid characters (only `A-Za-z0-9 ._\\/-` are allowed)")
 	}
-	if len(req.Note) > 30 {
-		return errors.New("parameter 'note' cannot be longer than 30 characters")
+	if len(req.Note) > 40 {
+		return errors.New("parameter 'note' cannot be longer than 40 characters")
 	}
 	if req.Timeout < 1 {
 		req.Timeout = viper.GetInt("requestTimeout")
