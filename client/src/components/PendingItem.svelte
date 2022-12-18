@@ -18,6 +18,16 @@
                         <b class="text-slate-900 dark:text-white">{item.requestor}</b> wants to <b class="text-slate-900 dark:text-white">{item.operation}</b> a key
                     </span>
                 </span>
+                {#if item.note}
+                    <span class="flex flex-row items-center text-sm">
+                        <span class="flex-grow-0 w-6 pr-2">
+                            <Icon icon="note" title="Note" size={'4'} />
+                        </span>
+                        <span class="flex-grow">
+                            <span class="italic font-semibold text-slate-900 dark:text-white">{item.note}</span>
+                        </span>
+                    </span>
+                {/if}
                 <span class="flex flex-row items-center text-sm">
                     <span class="flex-grow-0 w-6 pr-2">
                         <Icon icon="key" title="Vault name and key" size={'4'} />

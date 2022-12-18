@@ -123,11 +123,16 @@ func (w *Webhook) preparePlainRequest(webhookUrl string, data *WebhookRequest) (
 
 func (w *Webhook) prepareSlackRequest(webhookUrl string, data *WebhookRequest) (req *http.Request, err error) {
 	// Format the message
+	var note string
+	if data.Note != "" {
+		note = "Note: *" + data.Note + "*\n"
+	}
 	message := fmt.Sprintf(
-		"Received a request to %s a key using key **%s** in vault **%s**.\n[Confirm request](%s)\n`(Request ID: %s - Client IP: %s)`",
+		"Received a request to %s a key using key **%s** in vault **%s**.\n%s[Confirm request](%s)\n`(Request ID: %s - Client IP: %s)`",
 		data.OperationName,
 		data.KeyId,
 		data.Vault,
+		note,
 		w.getLink(data),
 		data.StateId,
 		data.Requestor,
@@ -165,4 +170,5 @@ type WebhookRequest struct {
 	Vault         string
 	StateId       string
 	Requestor     string
+	Note          string
 }

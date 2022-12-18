@@ -67,6 +67,7 @@ type requestState struct {
 	Requestor  string           `json:"-"`
 	Date       time.Time        `json:"-"`
 	Expiry     time.Time        `json:"-"`
+	Note       string           `json:"-"`
 }
 
 // Expired returns true if the request has expired
@@ -85,6 +86,7 @@ func (rs requestState) Public(stateId string) requestStatePublic {
 		Requestor: rs.Requestor,
 		Date:      rs.Date.Unix(),
 		Expiry:    rs.Expiry.Unix(),
+		Note:      rs.Note,
 	}
 }
 
@@ -98,4 +100,5 @@ type requestStatePublic struct {
 	Requestor string `json:"requestor,omitempty"`
 	Date      int64  `json:"date,omitempty"`
 	Expiry    int64  `json:"expiry,omitempty"`
+	Note      string `json:"note,omitempty"`
 }

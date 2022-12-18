@@ -24,6 +24,7 @@ export type pendingRequestItem = {
     requestor: string
     date: number
     expiry: number
+    note?: string
 }
 
 export type apiListResponse = pendingRequestItem[]

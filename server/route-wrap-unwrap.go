@@ -1,7 +1,9 @@
 package server
 
 import (
+	"errors"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -23,20 +25,10 @@ func (s *Server) RouteWrapUnwrap(op requestOperation) gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Invalid request body"))
 			return
 		}
-		if req.Vault == "" {
-			c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Missing parameter vault"))
+		err = req.Validate()
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Invalid request: "+err.Error()))
 			return
-		}
-		if req.KeyId == "" {
-			c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Missing parameter keyId"))
-			return
-		}
-		if req.Value == "" {
-			c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Missing parameter value"))
-			return
-		}
-		if req.Timeout < 1 {
-			req.Timeout = viper.GetInt("requestTimeout")
 		}
 		val, err := utils.DecodeBase64String(req.Value)
 		if err != nil {
@@ -71,6 +63,7 @@ func (s *Server) RouteWrapUnwrap(op requestOperation) gin.HandlerFunc {
 			Requestor:  ip,
 			Date:       now,
 			Expiry:     now.Add(validity),
+			Note:       req.Note,
 		}
 		s.states[stateId] = state
 
@@ -82,6 +75,7 @@ func (s *Server) RouteWrapUnwrap(op requestOperation) gin.HandlerFunc {
 				Vault:         req.Vault,
 				StateId:       stateId,
 				Requestor:     ip,
+				Note:          req.Note,
 			})
 			if webhookErr != nil {
 				s.log.Raw().Error().
@@ -111,4 +105,29 @@ type keyRequest struct {
 	KeyId      string `json:"keyId" form:"keyId"`
 	KeyVersion string `json:"keyVersion" form:"keyVersion"`
 	Timeout    int    `json:"timeout" form:"timeout"`
+	Note       string `json:"note" form:"note"`
+}
+
+var noteValidate = regexp.MustCompile(`[^A-Za-z0-9 ._-]`)
+
+func (req *keyRequest) Validate() error {
+	if req.Vault == "" {
+		return errors.New("missing parameter 'vault'")
+	}
+	if req.KeyId == "" {
+		return errors.New("missing parameter 'keyId'")
+	}
+	if req.Value == "" {
+		return errors.New("missing parameter 'value'")
+	}
+	if req.Note != "" && noteValidate.MatchString(req.Note) {
+		return errors.New("parameter 'note' contains invalid characters (only `A-Za-z0-9 ._-` are allowed)")
+	}
+	if len(req.Note) > 30 {
+		return errors.New("parameter 'note' cannot be longer than 30 characters")
+	}
+	if req.Timeout < 1 {
+		req.Timeout = viper.GetInt("requestTimeout")
+	}
+	return nil
 }
