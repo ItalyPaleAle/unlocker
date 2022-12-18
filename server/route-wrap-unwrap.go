@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"regexp"
 	"strings"
@@ -46,7 +47,7 @@ func (s *Server) RouteWrapUnwrap(op requestOperation) gin.HandlerFunc {
 		// First, store the request in the states map
 		stateUuid, err := uuid.NewRandom()
 		if err != nil {
-			_ = c.Error(err)
+			_ = c.Error(fmt.Errorf("failed to generate UUID: %w", err))
 			c.AbortWithStatusJSON(http.StatusInternalServerError, InternalServerError)
 			return
 		}
@@ -66,6 +67,8 @@ func (s *Server) RouteWrapUnwrap(op requestOperation) gin.HandlerFunc {
 			Note:       req.Note,
 		}
 		s.states[stateId] = state
+
+		s.metrics.RecordRequest(op.String(), req.Vault+"/"+req.KeyId)
 
 		// Invoke the webhook and send a message with the URL to unlock, in background
 		go func() {

@@ -96,7 +96,7 @@ All configuration options:
 - **`enableMetrics`** (optional, default: `false`):
   Enable the metrics server which exposes a Prometheus-compatible endpoint `/metrics`.
   Environmental variable name: `UNLOCKER_ENABLEMETRICS`
-- **`metricsPort`** (optional, default: `9000`):  
+- **`metricsPort`** (optional, default: `2112`):  
   Port for the metrics server to bind to.  
   Environmental variable name: `UNLOCKER_METRICSPORT`
 - **`metricsBind`** (optional, default: `0.0.0.0`):  

@@ -31,6 +31,7 @@ type Server struct {
 	states     map[string]*requestState
 	lock       *sync.RWMutex
 	webhook    *utils.Webhook
+	metrics    unlockerMetrics
 	// Subscribers that receive public events
 	pubsub *utils.Broker[*requestStatePublic]
 	// Subscriptions to watch for state changes
@@ -59,6 +60,10 @@ func (s *Server) Init(log *utils.AppLogger) error {
 		Timeout: 15 * time.Second,
 	}
 
+	// Init the Prometheus metrics
+	s.metrics.Init()
+
+	// Init the app server
 	err := s.initAppServer()
 	if err != nil {
 		return err
@@ -160,7 +165,7 @@ func (s *Server) Start(ctx context.Context) error {
 		}
 		metricsBindPort := viper.GetInt("metricsPort")
 		if metricsBindPort == 0 {
-			metricsBindPort = 9000
+			metricsBindPort = 2112
 		}
 		metricsSrv, err = s.startMetricsServer(metricsBindAddr, metricsBindPort)
 		if err != nil {
@@ -337,6 +342,9 @@ func (s *Server) expireRequest(stateId string, validity time.Duration) {
 		State:  stateId,
 		Status: StatusRemoved.String(),
 	})
+
+	// Record the result
+	s.metrics.RecordResult("expired")
 }
 
 // Loads the TLS certificate specified in the config file

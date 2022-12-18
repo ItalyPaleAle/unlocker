@@ -60,8 +60,8 @@ requestTimeout: 300
 enableMetrics: false
 
 # Port for the metrics server to listen on
-# Default: 9000
-metricsPort: 9000
+# Default: 2112
+metricsPort: 2112
 
 # Address for the metrics server to listen on
 # Default: "0.0.0.0" to listen on every interface

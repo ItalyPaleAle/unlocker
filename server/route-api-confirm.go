@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -79,6 +80,15 @@ func (s *Server) RouteApiConfirmPost(c *gin.Context) {
 
 // Handle confirmation of operations
 func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestState) {
+	defer func() {
+		// Record the result in a deferred function to automatically catch failures
+		if len(c.Errors) > 0 {
+			s.metrics.RecordResult("error")
+		} else {
+			s.metrics.RecordResult("confirmed")
+		}
+	}()
+
 	// Errors here should never happen
 	var at string
 	atAny, ok := c.Get(contextKeySessionAccessToken)
@@ -88,6 +98,8 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestSta
 			at = ""
 		}
 	}
+
+	start := time.Now()
 
 	// Init the Key Vault client
 	akv := keyvault.Client{}
@@ -129,6 +141,9 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestSta
 		c.AbortWithStatusJSON(http.StatusInternalServerError, InternalServerError)
 		return
 	}
+
+	// Record the latency
+	s.metrics.RecordLatency(state.Vault, time.Since(start))
 
 	// Re-acquire a lock before modifying the state object and sending a notification
 	s.lock.Lock()
@@ -175,6 +190,9 @@ func (s *Server) cancelRequest(stateId string, state *requestState) {
 
 	// Send a notification to the subscriber if any
 	s.notifySubscriber(stateId, state)
+
+	// Record the result
+	s.metrics.RecordResult("canceled")
 }
 
 type confirmRequest struct {
