@@ -3,11 +3,12 @@ package server
 import (
 	"context"
 	"crypto/tls"
-	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/viper"
 
 	"github.com/italypaleale/unlocker/utils"
@@ -57,6 +59,15 @@ func (s *Server) Init(log *utils.AppLogger) error {
 		Timeout: 15 * time.Second,
 	}
 
+	err := s.initAppServer()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Server) initAppServer() error {
 	// Create the Gin router and add various middlewares
 	s.router = gin.New()
 	s.router.Use(gin.Recovery())
@@ -106,7 +117,7 @@ func (s *Server) Init(log *utils.AppLogger) error {
 	}
 
 	// Add routes
-	s.router.GET("/healthz", s.RouteHealthz)
+	s.router.GET("/healthz", gin.WrapF(s.RouteHealthzHandler))
 	s.router.POST("/wrap", allowIpMw, s.RouteWrapUnwrap(OperationWrap))
 	s.router.POST("/unwrap", allowIpMw, s.RouteWrapUnwrap(OperationUnwrap))
 	s.router.GET("/result/:state", allowIpMw, s.RouteResult)
@@ -126,29 +137,80 @@ func (s *Server) Init(log *utils.AppLogger) error {
 func (s *Server) Start(ctx context.Context) error {
 	s.ctx = ctx
 
-	// Get address and port to bind to (fallback to default)
-	bindAddr := viper.GetString("bind")
-	if bindAddr == "" {
-		bindAddr = "127.0.0.1"
+	// App server
+	appBindAddr := viper.GetString("bind")
+	if appBindAddr == "" {
+		appBindAddr = "0.0.0.0"
 	}
-	bindPort := viper.GetInt("port")
-	if bindPort == 0 {
-		bindPort = 8080
+	appBindPort := viper.GetInt("port")
+	if appBindPort == 0 {
+		appBindPort = 8080
 	}
-
-	// Launch the server (this is a blocking call)
-	return s.launchServer(bindAddr, bindPort)
-}
-
-// Start the server
-func (s *Server) launchServer(bindAddr string, bindPort int) error {
-	// HTTPS server
-	tlsCert, err := s.loadTLSCert()
+	appSrv, err := s.startAppServer(appBindAddr, appBindPort)
 	if err != nil {
 		return err
 	}
+
+	// Metrics server
+	var metricsSrv *http.Server
+	if viper.GetBool("enableMetrics") {
+		metricsBindAddr := viper.GetString("metricsBind")
+		if metricsBindAddr == "" {
+			metricsBindAddr = "0.0.0.0"
+		}
+		metricsBindPort := viper.GetInt("metricsPort")
+		if metricsBindPort == 0 {
+			metricsBindPort = 9000
+		}
+		metricsSrv, err = s.startMetricsServer(metricsBindAddr, metricsBindPort)
+		if err != nil {
+			return err
+		}
+	}
+
+	// Listen to SIGINT and SIGTERM signals
+	ch := make(chan os.Signal, 1)
+	signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
+
+	// Block until we either get a termination signal, or until the context is canceled
+	select {
+	case <-s.ctx.Done():
+	case <-ch:
+	}
+
+	// We received an interrupt signal, shut down the server
+	s.pubsub.Shutdown()
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	err = appSrv.Shutdown(shutdownCtx)
+	shutdownCancel()
+	if err != nil {
+		// Log the error only (could be context canceled)
+		s.log.Raw().Warn().
+			AnErr("error", err).
+			Msg("App server shutdown error")
+	}
+
+	shutdownCtx, shutdownCancel = context.WithTimeout(context.Background(), time.Second)
+	err = metricsSrv.Shutdown(shutdownCtx)
+	shutdownCancel()
+	if err != nil {
+		// Log the error only (could be context canceled)
+		s.log.Raw().Warn().
+			AnErr("error", err).
+			Msg("Metrics server shutdown error")
+	}
+
+	return nil
+}
+
+func (s *Server) startAppServer(bindAddr string, bindPort int) (*http.Server, error) {
+	// Create the HTTPS server
+	tlsCert, err := s.loadTLSCert()
+	if err != nil {
+		return nil, err
+	}
 	httpSrv := &http.Server{
-		Addr:              fmt.Sprintf("%s:%d", bindAddr, bindPort),
+		Addr:              net.JoinHostPort(bindAddr, strconv.Itoa(bindPort)),
 		Handler:           s.router,
 		MaxHeaderBytes:    1 << 20,
 		ReadHeaderTimeout: 10 * time.Second,
@@ -164,37 +226,44 @@ func (s *Server) launchServer(bindAddr string, bindPort int) error {
 			Str("bind", bindAddr).
 			Int("port", bindPort).
 			Str("url", viper.GetString("baseUrl")).
-			Msg("HTTPS server started")
+			Msg("App server started")
 		// Next call blocks until the server is shut down
 		err := httpSrv.ListenAndServeTLS("", "")
 		if err != http.ErrServerClosed {
-			s.log.Raw().Panic().Msgf("Error starting server: %v", err)
+			s.log.Raw().Panic().Msgf("Error starting app server: %v", err)
 		}
 	}()
 
-	// Listen to SIGINT and SIGTERM signals
-	ch := make(chan os.Signal, 1)
-	signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
+	return httpSrv, nil
+}
 
-	// Block until we either get a termination signal, or until the context is canceled
-	select {
-	case <-s.ctx.Done():
-	case <-ch:
+func (s *Server) startMetricsServer(bindAddr string, bindPort int) (*http.Server, error) {
+	// Handler
+	mux := http.NewServeMux()
+	mux.HandleFunc("/healthz", s.RouteHealthzHandler)
+	mux.Handle("/metrics", promhttp.Handler())
+
+	// Create the HTTP server
+	httpSrv := &http.Server{
+		Addr:              net.JoinHostPort(bindAddr, strconv.Itoa(bindPort)),
+		Handler:           mux,
+		MaxHeaderBytes:    1 << 20,
+		ReadHeaderTimeout: 10 * time.Second,
 	}
 
-	// We received an interrupt signal, shut down the server
-	s.pubsub.Shutdown()
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	err = httpSrv.Shutdown(shutdownCtx)
-	shutdownCancel()
-	// Log the errors (could be context canceled)
-	if err != nil {
-		s.log.Raw().Warn().
-			AnErr("error", err).
-			Msg("HTTP server shutdown error")
-	}
+	// Start the HTTPS server in a background goroutine
+	go func() {
+		s.log.Raw().Info().
+			Int("port", bindPort).
+			Msg("Metrics server started")
+		// Next call blocks until the server is shut down
+		err := httpSrv.ListenAndServe()
+		if err != http.ErrServerClosed {
+			s.log.Raw().Panic().Msgf("Error starting metrics server: %v", err)
+		}
+	}()
 
-	return nil
+	return httpSrv, nil
 }
 
 // Adds a subscription to a state by key

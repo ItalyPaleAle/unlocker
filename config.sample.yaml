@@ -22,7 +22,7 @@ webhookKey: ""
 tlsCert: ""
 tlsKey: ""
 
-# Port to listen to
+# Port to listen on
 # Default: 8080
 port: 8080
 
@@ -54,6 +54,18 @@ sessionTimeout: 300
 # Default 300 (5 minutes)
 # Can be overridden in each request
 requestTimeout: 300
+
+# Enable the metrics server which exposes a Prometheus-compatible endpoint `/metrics`
+# Default: false
+enableMetrics: false
+
+# Port for the metrics server to listen on
+# Default: 9000
+metricsPort: 9000
+
+# Address for the metrics server to listen on
+# Default: "0.0.0.0" to listen on every interface
+metricsBind: "0.0.0.0"
 
 # String used as key to sign state tokens
 # If left empty (recommended), it will be randomly generated every time the app starts 

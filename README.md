@@ -93,6 +93,15 @@ All configuration options:
 - **`requestTimeout`** (optional, default: `300`, i.e. 5 minutes):  
   Default timeout for wrap and unwrap requests, in seconds. This is the default value, and can be overridden in each request.  
   Environmental variable name: `UNLOCKER_REQUESTTIMEOUT`
+- **`enableMetrics`** (optional, default: `false`):
+  Enable the metrics server which exposes a Prometheus-compatible endpoint `/metrics`.
+  Environmental variable name: `UNLOCKER_ENABLEMETRICS`
+- **`metricsPort`** (optional, default: `9000`):  
+  Port for the metrics server to bind to.  
+  Environmental variable name: `UNLOCKER_METRICSPORT`
+- **`metricsBind`** (optional, default: `0.0.0.0`):  
+  Address/interface for the metrics server to bind to.  
+  Environmental variable name: `UNLOCKER_METRICSBIND`
 - **`tokenSigningKey`** (optional, will be randomly generated at startup if empty):  
   String used as key to sign state tokens. If left empty (recommended), it will be randomly generated every time the app starts  
   Environmental variable name: `UNLOCKER_TOKENSIGNINGKEY`
