@@ -179,6 +179,7 @@ To wrap (encrypt) a key, first make a POST request to the **`/wrap`** endpoint. 
 - Optional keys:
   - **`keyVersion`** (string): The version of the key stored in Key Vault to use; if omitted, it defaults to the latest key.
   - **`timeout`** (integer): An optional timeout for the operation, in seconds. If empty, the value is taken from the configuration option `requestTimeout` (whose default value is 300 seconds, or 5 minutes). If an admin doesn't approve (or deny) the operation in that timeframe, the request is automatically canceled.
+  - **`note`** (string): A freeform message that is displayed to clients alongside the request. For example, it can be used to add an identifier to the request.
 
 For example, with curl and the sample data above (note that `aGVsbG93b3JsZA==` is the base64-encoded representation of `helloworld`, the key we want to encrypt; we are also setting an optional timeout of 10 minutes, or 600 seconds):
 
@@ -186,7 +187,7 @@ For example, with curl and the sample data above (note that `aGVsbG93b3JsZA==` i
 curl https://10.20.30.40:8080/wrap \
   --insecure \
   -H "Content-Type: application/json" \
-  --data '{"vault":"myunlockerkv","keyId":"wrappingkey1","value":"aGVsbG93b3JsZA==","timeout":600}'
+  --data '{"vault":"myunlockerkv","keyId":"wrappingkey1","value":"aGVsbG93b3JsZA==","timeout":600,"note":"The secret"}'
 ```
 
 > Note: in all the examples we're using the `--insecure` flag to tell curl to accept self-signed TLS certificates. If you are using a TLS certificate signed by a Certification Authority, you can (and should) omit that flag.
