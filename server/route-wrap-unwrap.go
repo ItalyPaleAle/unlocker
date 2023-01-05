@@ -66,7 +66,11 @@ func (s *Server) RouteWrapUnwrap(op requestOperation) gin.HandlerFunc {
 			Expiry:     now.Add(validity),
 			Note:       req.Note,
 		}
+
+		// Use the lock to ensure we are not modifying s.states concurrently
+		s.lock.Lock()
 		s.states[stateId] = state
+		s.lock.Unlock()
 
 		s.metrics.RecordRequest(op.String(), req.Vault+"/"+req.KeyId)
 
