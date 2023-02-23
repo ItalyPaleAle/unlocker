@@ -14,7 +14,7 @@ on:
       - 'v*'
 
 env:
-  GO_VERSION: "^1.19"
+  GO_VERSION: "1.20"
   CGO_ENABLED: "0"
   NODE_VERSION: "18"
   # Username for Docker Hub-set to empty to disable pushing to Docker Hub
@@ -42,7 +42,7 @@ jobs:
         run: |
           mkdir -p .bin
           # Fetch semver: https://github.com/fsaintjacques/semver-tool
-          curl https://raw.githubusercontent.com/fsaintjacques/semver-tool/3.3.0/src/semver > .bin/semver
+          curl https://raw.githubusercontent.com/fsaintjacques/semver-tool/3.4.0/src/semver > .bin/semver
           chmod +x .bin/semver
 
           if [ "${{ github.ref }}" == "refs/heads/main" ]; then
