@@ -5,13 +5,10 @@ import (
 	"crypto/tls"
 	"net"
 	"net/http"
-	"os"
-	"os/signal"
 	"regexp"
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -24,7 +21,6 @@ import (
 
 // Server is the server based on Gin
 type Server struct {
-	ctx        context.Context
 	router     *gin.Engine
 	httpClient *http.Client
 	log        *utils.AppLogger
@@ -140,8 +136,6 @@ func (s *Server) initAppServer() error {
 // Start the web server
 // Note this function is blocking, and will return only when the servers are shut down (via context cancellation or via SIGINT/SIGTERM signals)
 func (s *Server) Start(ctx context.Context) error {
-	s.ctx = ctx
-
 	// App server
 	appBindAddr := viper.GetString("bind")
 	if appBindAddr == "" {
@@ -173,17 +167,10 @@ func (s *Server) Start(ctx context.Context) error {
 		}
 	}
 
-	// Listen to SIGINT and SIGTERM signals
-	ch := make(chan os.Signal, 1)
-	signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
+	// Block until the context is canceled
+	<-ctx.Done()
 
-	// Block until we either get a termination signal, or until the context is canceled
-	select {
-	case <-s.ctx.Done():
-	case <-ch:
-	}
-
-	// We received an interrupt signal, shut down the server
+	// We received an interrupt signal, shut down the servers
 	s.pubsub.Shutdown()
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	err = appSrv.Shutdown(shutdownCtx)

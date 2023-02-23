@@ -7,7 +7,9 @@ import (
 	"errors"
 	"io"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 
 	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
@@ -42,8 +44,19 @@ func main() {
 		return
 	}
 
-	// Start the server in background and block until the server is shut down
-	err = srv.Start(context.Background())
+	// Listen for SIGTERM and SIGINT in background to stop the context
+	ctx, cancel := context.WithCancel(context.Background())
+	go func() {
+		ch := make(chan os.Signal, 1)
+		signal.Notify(ch, os.Interrupt, syscall.SIGTERM)
+
+		<-ch
+		appLogger.Raw().Info().Msg("Received interrupt signal. Shutting down…")
+		cancel()
+	}()
+
+	// Start the server in background and block until the server is shut down (gracefully)
+	err = srv.Start(ctx)
 	if err != nil {
 		appLogger.Raw().Fatal().
 			AnErr("error", err).
