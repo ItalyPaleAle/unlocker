@@ -143,6 +143,8 @@ func loadConfig() {
 
 	// Generate random tokenSigningKey if needed
 	if viper.GetString("tokenSigningKey") == "" {
+		appLogger.Raw().Info().Msg("No 'tokenSigningKey' found in the configuration: a random one will be generated")
+
 		tokenSigningKey, err := utils.RandomString()
 		if err != nil {
 			appLogger.Raw().Fatal().
@@ -161,6 +163,8 @@ func loadConfig() {
 		h := sha256.Sum256([]byte(cekStr))
 		cek = h[:]
 	} else {
+		appLogger.Raw().Info().Msg("No 'cookieEncryptionKey' found in the configuration: a random one will be generated")
+
 		cek = make([]byte, 16)
 		_, err := io.ReadFull(rand.Reader, cek)
 		if err != nil {
