@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/italypaleale/unlocker/client"
+	"github.com/italypaleale/unlocker/config"
 )
 
 //go:generate ../client/build.sh
@@ -23,7 +24,7 @@ const staticBaseDir = "dist"
 
 func (s *Server) serveClient() func(c *gin.Context) {
 	// Option used during development to proxy to another server (such as a dev server)
-	clientProxyServer := viper.GetString("dev.clientProxyServer")
+	clientProxyServer := viper.GetString(config.KeyDevClientProxyServer)
 
 	if clientProxyServer == "" {
 		return func(c *gin.Context) {

@@ -9,12 +9,14 @@ import (
 	"github.com/go-jose/go-jose/v3"
 	"github.com/go-jose/go-jose/v3/jwt"
 	"github.com/spf13/viper"
+
+	"github.com/italypaleale/unlocker/config"
 )
 
 const jwtIssuer = "unlocker"
 
 func getSecureCookie(c *gin.Context, name string) (plaintextValue string, ttl time.Duration, err error) {
-	key, ok := viper.Get("cookieEncryptionKey").([]byte)
+	key, ok := viper.Get(config.KeyCookieEncryptionKey).([]byte)
 	if !ok || len(key) != 16 {
 		return "", 0, errors.New("empty or invalid cookieEncryptionKey in the configuration")
 	}
@@ -44,7 +46,7 @@ func getSecureCookie(c *gin.Context, name string) (plaintextValue string, ttl ti
 	if c1.Issuer != jwtIssuer {
 		return "", 0, errors.New("invalid value for 'iss' claim")
 	}
-	if len(c1.Audience) != 1 || c1.Audience[0] != viper.GetString("azureClientId") {
+	if len(c1.Audience) != 1 || c1.Audience[0] != viper.GetString(config.KeyAzureClientId) {
 		return "", 0, errors.New("invalid value for 'aud' claim")
 	}
 	now := time.Now()
@@ -73,7 +75,7 @@ func getSecureCookie(c *gin.Context, name string) (plaintextValue string, ttl ti
 }
 
 func setSecureCookie(c *gin.Context, name string, plaintextValue string, maxAge int, path string, domain string, secureCookie bool, httpOnly bool) error {
-	key, ok := viper.Get("cookieEncryptionKey").([]byte)
+	key, ok := viper.Get(config.KeyCookieEncryptionKey).([]byte)
 	if !ok || len(key) != 16 {
 		return errors.New("empty or invalid cookieEncryptionKey in the configuration")
 	}
@@ -84,7 +86,7 @@ func setSecureCookie(c *gin.Context, name string, plaintextValue string, maxAge 
 		Issuer: jwtIssuer,
 		Audience: jwt.Audience{
 			// Use the Azure client ID as our audience too
-			viper.GetString("azureClientId"),
+			viper.GetString(config.KeyAzureClientId),
 		},
 		// Add 1 extra second to synchronize with cookie expiry
 		Expiry:    jwt.NewNumericDate(now.Add(time.Duration(maxAge+1) * time.Second)),

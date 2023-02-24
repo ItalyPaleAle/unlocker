@@ -14,6 +14,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
 
+	"github.com/italypaleale/unlocker/config"
 	"github.com/italypaleale/unlocker/server"
 	"github.com/italypaleale/unlocker/utils"
 )
@@ -67,11 +68,11 @@ func main() {
 
 func loadConfig() {
 	// Defaults
-	viper.SetDefault("port", 8080)
-	viper.SetDefault("bind", "0.0.0.0")
-	viper.SetDefault("baseUrl", "https://localhost:8080")
-	viper.SetDefault("sessionTimeout", 300)
-	viper.SetDefault("requestTimeout", 300)
+	viper.SetDefault(config.KeyPort, 8080)
+	viper.SetDefault(config.KeyBind, "0.0.0.0")
+	viper.SetDefault(config.KeyBaseUrl, "https://localhost:8080")
+	viper.SetDefault(config.KeySessionTimeout, 300)
+	viper.SetDefault(config.KeyRequestTimeout, 300)
 
 	// Env
 	viper.SetEnvPrefix("UNLOCKER")
@@ -99,34 +100,34 @@ func loadConfig() {
 	}
 
 	// Check required variables
-	if viper.GetString("azureClientId") == "" {
+	if viper.GetString(config.KeyAzureClientId) == "" {
 		appLogger.Raw().Fatal().
 			AnErr("error", errors.New("Config entry key 'azureClientId' missing")).
 			Msg("Invalid configuration")
 	}
-	if viper.GetString("azureClientSecret") == "" {
+	if viper.GetString(config.KeyAzureClientSecret) == "" {
 		appLogger.Raw().Fatal().
 			AnErr("error", errors.New("Config entry key 'azureClientSecret' missing")).
 			Msg("Invalid configuration")
 	}
-	if viper.GetString("azureTenantId") == "" {
+	if viper.GetString(config.KeyAzureTenantId) == "" {
 		appLogger.Raw().Fatal().
 			AnErr("error", errors.New("Config entry key 'azureTenantId' missing")).
 			Msg("Invalid configuration")
 	}
-	if viper.GetString("webhookUrl") == "" {
+	if viper.GetString(config.KeyWebhookUrl) == "" {
 		appLogger.Raw().Fatal().
 			AnErr("error", errors.New("Config entry key 'webhookUrl' missing")).
 			Msg("Invalid configuration")
 	}
 
 	// Check for invalid values
-	if v := viper.GetInt("sessionTimeout"); v < 1 || v > 3600 {
+	if v := viper.GetInt(config.KeySessionTimeout); v < 1 || v > 3600 {
 		appLogger.Raw().Fatal().
 			AnErr("error", errors.New("Config entry key 'sessionTimeout' is invalid: must be between 1 and 3600")).
 			Msg("Invalid configuration")
 	}
-	if v := viper.GetInt("requestTimeout"); v < 1 {
+	if v := viper.GetInt(config.KeyRequestTimeout); v < 1 {
 		appLogger.Raw().Fatal().
 			AnErr("error", errors.New("Config entry key 'requestTimeout' is invalid: must be greater than 1")).
 			Msg("Invalid configuration")
@@ -134,15 +135,15 @@ func loadConfig() {
 
 	// TLS certificate
 	// Fallback to tls-cert.pem and tls-key.pem if not set
-	if viper.GetString("tlsCert") == "" || viper.GetString("tlsKey") == "" {
+	if viper.GetString(config.KeyTLSCert) == "" || viper.GetString(config.KeyTLSKey) == "" {
 		file := viper.ConfigFileUsed()
 		dir := filepath.Dir(file)
-		viper.Set("tlsCert", filepath.Join(dir, "tls-cert.pem"))
-		viper.Set("tlsKey", filepath.Join(dir, "tls-key.pem"))
+		viper.Set(config.KeyTLSCert, filepath.Join(dir, "tls-cert.pem"))
+		viper.Set(config.KeyTLSKey, filepath.Join(dir, "tls-key.pem"))
 	}
 
 	// Generate random tokenSigningKey if needed
-	if viper.GetString("tokenSigningKey") == "" {
+	if viper.GetString(config.KeyTokenSigningKey) == "" {
 		appLogger.Raw().Info().Msg("No 'tokenSigningKey' found in the configuration: a random one will be generated")
 
 		tokenSigningKey, err := utils.RandomString()
@@ -152,13 +153,13 @@ func loadConfig() {
 				Msg("Failed to generate random tokenSigningKey")
 		}
 
-		viper.Set("tokenSigningKey", tokenSigningKey)
+		viper.Set(config.KeyTokenSigningKey, tokenSigningKey)
 	}
 
 	// If we have cookieEncryptionKey set, derive a 128-bit key from that
 	// Otherwise, generate a random 128-bit key
 	var cek []byte
-	cekStr := viper.GetString("cookieEncryptionKey")
+	cekStr := viper.GetString(config.KeyCookieEncryptionKey)
 	if cekStr != "" {
 		h := sha256.Sum256([]byte(cekStr))
 		cek = h[:]
@@ -173,5 +174,5 @@ func loadConfig() {
 				Msg("Failed to generate random cookieEncryptionKey")
 		}
 	}
-	viper.Set("cookieEncryptionKey", cek)
+	viper.Set(config.KeyCookieEncryptionKey, cek)
 }

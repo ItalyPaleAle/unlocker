@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/spf13/viper"
 
+	"github.com/italypaleale/unlocker/config"
 	"github.com/italypaleale/unlocker/utils"
 )
 
@@ -134,7 +135,7 @@ func (req *keyRequest) Validate() error {
 		return errors.New("parameter 'note' cannot be longer than 40 characters")
 	}
 	if req.Timeout < 1 {
-		req.Timeout = viper.GetInt("requestTimeout")
+		req.Timeout = viper.GetInt(config.KeyRequestTimeout)
 	}
 	return nil
 }

@@ -16,6 +16,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/viper"
 
+	"github.com/italypaleale/unlocker/config"
 	"github.com/italypaleale/unlocker/utils"
 )
 
@@ -95,10 +96,10 @@ func (s *Server) initAppServer() error {
 	}
 
 	// Check if we are restricting the origins for CORS
-	originsStr := viper.GetString("origins")
+	originsStr := viper.GetString(config.KeyOrigins)
 	if originsStr == "" {
 		// Default is baseUrl
-		originsStr = viper.GetString("baseUrl")
+		originsStr = viper.GetString(config.KeyBaseUrl)
 	}
 	if originsStr == "*" {
 		corsConfig.AllowAllOrigins = true
@@ -137,11 +138,11 @@ func (s *Server) initAppServer() error {
 // Note this function is blocking, and will return only when the servers are shut down (via context cancellation or via SIGINT/SIGTERM signals)
 func (s *Server) Start(ctx context.Context) error {
 	// App server
-	appBindAddr := viper.GetString("bind")
+	appBindAddr := viper.GetString(config.KeyBind)
 	if appBindAddr == "" {
 		appBindAddr = "0.0.0.0"
 	}
-	appBindPort := viper.GetInt("port")
+	appBindPort := viper.GetInt(config.KeyPort)
 	if appBindPort == 0 {
 		appBindPort = 8080
 	}
@@ -152,12 +153,12 @@ func (s *Server) Start(ctx context.Context) error {
 
 	// Metrics server
 	var metricsSrv *http.Server
-	if viper.GetBool("enableMetrics") {
-		metricsBindAddr := viper.GetString("metricsBind")
+	if viper.GetBool(config.KeyEnableMetrics) {
+		metricsBindAddr := viper.GetString(config.KeyMetricsBind)
 		if metricsBindAddr == "" {
 			metricsBindAddr = "0.0.0.0"
 		}
-		metricsBindPort := viper.GetInt("metricsPort")
+		metricsBindPort := viper.GetInt(config.KeyMetricsPort)
 		if metricsBindPort == 0 {
 			metricsBindPort = 2112
 		}
@@ -217,7 +218,7 @@ func (s *Server) startAppServer(bindAddr string, bindPort int) (*http.Server, er
 		s.log.Raw().Info().
 			Str("bind", bindAddr).
 			Int("port", bindPort).
-			Str("url", viper.GetString("baseUrl")).
+			Str("url", viper.GetString(config.KeyBaseUrl)).
 			Msg("App server started")
 		// Next call blocks until the server is shut down
 		err := httpSrv.ListenAndServeTLS("", "")
@@ -336,8 +337,8 @@ func (s *Server) expireRequest(stateId string, validity time.Duration) {
 
 // Loads the TLS certificate specified in the config file
 func (s *Server) loadTLSCert() ([]tls.Certificate, error) {
-	tlsCert := viper.GetString("tlsCert")
-	tlsKey := viper.GetString("tlsKey")
+	tlsCert := viper.GetString(config.KeyTLSCert)
+	tlsKey := viper.GetString(config.KeyTLSKey)
 
 	// Check if the values from the config file are PEM-encoded certificates directly
 	obj, err := tls.X509KeyPair([]byte(tlsCert), []byte(tlsKey))

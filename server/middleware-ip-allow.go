@@ -8,12 +8,14 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
+
+	"github.com/italypaleale/unlocker/config"
 )
 
 // AllowIpMiddleware is a middleware that allows requests from certain IPs only
 func (s *Server) AllowIpMiddleware() (gin.HandlerFunc, error) {
 	// Get the list of IPs and ranges that are allowed
-	conf := viper.GetString("allowedIps")
+	conf := viper.GetString(config.KeyAllowedIps)
 	if conf == "" {
 		// Allow all IPs, so do nothing
 		return func(c *gin.Context) {}, nil

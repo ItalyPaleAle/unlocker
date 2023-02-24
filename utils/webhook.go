@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/spf13/viper"
+
+	"github.com/italypaleale/unlocker/config"
 )
 
 // Webhook client
@@ -31,13 +33,13 @@ func (w *Webhook) Init(log *AppLogger) {
 
 // SendWebhook sends the notification
 func (w *Webhook) SendWebhook(data *WebhookRequest) (err error) {
-	webhookUrl := viper.GetString("webhookUrl")
+	webhookUrl := viper.GetString(config.KeyWebhookUrl)
 
 	// Retry up to 3 times
 	const attempts = 3
 	for i := 0; i < attempts; i++ {
 		var req *http.Request
-		switch strings.ToLower(viper.GetString("webhookFormat")) {
+		switch strings.ToLower(viper.GetString(config.KeyWebhookFormat)) {
 		case "slack":
 			req, err = w.prepareSlackRequest(webhookUrl, data)
 		case "discord":
@@ -91,7 +93,7 @@ func (w *Webhook) SendWebhook(data *WebhookRequest) (err error) {
 }
 
 func (w *Webhook) getLink(data *WebhookRequest) string {
-	return viper.GetString("baseUrl")
+	return viper.GetString(config.KeyBaseUrl)
 }
 
 func (w *Webhook) preparePlainRequest(webhookUrl string, data *WebhookRequest) (req *http.Request, err error) {
@@ -113,7 +115,7 @@ func (w *Webhook) preparePlainRequest(webhookUrl string, data *WebhookRequest) (
 	}
 	req.Header.Set("Content-Type", "text/plain")
 
-	webhookKey := viper.GetString("webhookKey")
+	webhookKey := viper.GetString(config.KeyWebhookKey)
 	if webhookKey != "" {
 		req.Header.Set("Authorization", webhookKey)
 	}
@@ -156,7 +158,7 @@ func (w *Webhook) prepareSlackRequest(webhookUrl string, data *WebhookRequest) (
 	}
 	req.Header.Set("Content-Type", "application/json")
 
-	webhookKey := viper.GetString("webhookKey")
+	webhookKey := viper.GetString(config.KeyWebhookKey)
 	if webhookKey != "" {
 		req.Header.Set("Authorization", webhookKey)
 	}

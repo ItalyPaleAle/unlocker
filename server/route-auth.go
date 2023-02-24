@@ -16,6 +16,7 @@ import (
 	"github.com/spf13/viper"
 	"golang.org/x/text/unicode/norm"
 
+	"github.com/italypaleale/unlocker/config"
 	"github.com/italypaleale/unlocker/utils"
 )
 
@@ -60,11 +61,11 @@ func (s *Server) RouteAuth(c *gin.Context) {
 	c.SetCookie(csrfCookieName, seed, int(csrfCookieMaxAge.Seconds()), "/", c.Request.URL.Host, secureCookie, true)
 
 	// Build the redirect URL
-	tenantId := viper.GetString("azureTenantId")
+	tenantId := viper.GetString(config.KeyAzureTenantId)
 	qs := url.Values{
 		"response_type": []string{"code"},
-		"client_id":     []string{viper.GetString("azureClientId")},
-		"redirect_uri":  []string{viper.GetString("baseUrl") + "/auth/confirm"},
+		"client_id":     []string{viper.GetString(config.KeyAzureClientId)},
+		"redirect_uri":  []string{viper.GetString(config.KeyBaseUrl) + "/auth/confirm"},
 		"response_mode": []string{"query"},
 		"state":         []string{stateToken},
 		"scope":         []string{"https://vault.azure.net/user_impersonation"},
@@ -121,7 +122,7 @@ func (s *Server) RouteAuthConfirm(c *gin.Context) {
 	}
 
 	// Set the access token in a cookie
-	maxAge := viper.GetInt("sessionTimeout")
+	maxAge := viper.GetInt(config.KeySessionTimeout)
 	err = setSecureCookie(c, atCookieName, accessToken.AccessToken, maxAge, "/", c.Request.URL.Host, secureCookie, true)
 	if err != nil {
 		_ = c.Error(err)
@@ -130,22 +131,22 @@ func (s *Server) RouteAuthConfirm(c *gin.Context) {
 	}
 
 	// Redirect the user to the main page
-	c.Redirect(http.StatusTemporaryRedirect, viper.GetString("baseUrl"))
+	c.Redirect(http.StatusTemporaryRedirect, viper.GetString(config.KeyBaseUrl))
 }
 
 func (s *Server) requestAccessToken(ctx context.Context, code string) (*AccessToken, error) {
 	// Build the request
 	data := url.Values{
 		"code":          []string{code},
-		"client_id":     []string{viper.GetString("azureClientId")},
-		"client_secret": []string{viper.GetString("azureClientSecret")},
-		"redirect_uri":  []string{viper.GetString("baseUrl") + "/auth/confirm"},
+		"client_id":     []string{viper.GetString(config.KeyAzureClientId)},
+		"client_secret": []string{viper.GetString(config.KeyAzureClientSecret)},
+		"redirect_uri":  []string{viper.GetString(config.KeyBaseUrl) + "/auth/confirm"},
 		"scope":         []string{"https://vault.azure.net/user_impersonation"},
 		"grant_type":    []string{"authorization_code"},
 	}
 	body := strings.NewReader(data.Encode())
 
-	req, err := http.NewRequestWithContext(ctx, "POST", "https://login.microsoftonline.com/"+viper.GetString("azureTenantId")+"/oauth2/v2.0/token", body)
+	req, err := http.NewRequestWithContext(ctx, "POST", "https://login.microsoftonline.com/"+viper.GetString(config.KeyAzureTenantId)+"/oauth2/v2.0/token", body)
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +181,7 @@ func (s *Server) requestAccessToken(ctx context.Context, code string) (*AccessTo
 }
 
 func createStateToken(c *gin.Context) (stateToken string, seed string, err error) {
-	tokenSigningKey := viper.GetString("tokenSigningKey")
+	tokenSigningKey := viper.GetString(config.KeyTokenSigningKey)
 	if tokenSigningKey == "" {
 		// Should never happen
 		return "", "", errors.New("tokenSigningKey is empty in the configuration")
@@ -205,7 +206,7 @@ func createStateToken(c *gin.Context) (stateToken string, seed string, err error
 }
 
 func validateStateToken(c *gin.Context, stateToken string, seed string) bool {
-	tokenSigningKey := viper.GetString("tokenSigningKey")
+	tokenSigningKey := viper.GetString(config.KeyTokenSigningKey)
 	if tokenSigningKey == "" {
 		// Should never happen
 		return false
