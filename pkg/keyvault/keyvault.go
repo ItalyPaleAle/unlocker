@@ -2,6 +2,7 @@ package keyvault
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -23,7 +24,7 @@ func (c *Client) Init(accessToken string) error {
 
 	// Init a HTTP client
 	c.httpClient = &http.Client{
-		Timeout: 10 * time.Second,
+		Timeout: 20 * time.Second,
 	}
 
 	return nil
@@ -38,9 +39,9 @@ func (c *Client) KeyUrl(vault, keyId, keyVersion string) string {
 }
 
 // GetKeyLastVersion returns the latest version of a key stored in Key Vault
-func (c *Client) GetKeyLastVersion(vault, keyId string) (string, error) {
+func (c *Client) GetKeyLastVersion(ctx context.Context, vault string, keyId string) (string, error) {
 	reqUrl := fmt.Sprintf("https://%s.vault.azure.net/keys/%s", vault, keyId)
-	req, err := http.NewRequest("GET", reqUrl+"?api-version=7.2", nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", reqUrl+"?api-version=7.2", nil)
 	if err != nil {
 		return "", err
 	}
@@ -83,7 +84,7 @@ func (c *Client) GetKeyLastVersion(vault, keyId string) (string, error) {
 }
 
 // WrapKey wraps a key using the key-encryption-key stored in the Key Vault at keyUrl
-func (c *Client) WrapKey(keyUrl string, key []byte) ([]byte, error) {
+func (c *Client) WrapKey(ctx context.Context, keyUrl string, key []byte) ([]byte, error) {
 	if keyUrl == "" {
 		return nil, errors.New("argument keyUrl is empty")
 	}
@@ -92,11 +93,11 @@ func (c *Client) WrapKey(keyUrl string, key []byte) ([]byte, error) {
 	}
 
 	// Send the request
-	return c.doWrapUnwrap(keyUrl+"/wrapkey", key)
+	return c.doWrapUnwrap(ctx, keyUrl+"/wrapkey", key)
 }
 
 // UnwrapKey unwrap a wrapped key using the key-encryption-key stored in the Key Vault at keyUrl
-func (c *Client) UnwrapKey(keyUrl string, wrappedKey []byte) ([]byte, error) {
+func (c *Client) UnwrapKey(ctx context.Context, keyUrl string, wrappedKey []byte) ([]byte, error) {
 	if keyUrl == "" {
 		return nil, errors.New("argument keyUrl is empty")
 	}
@@ -105,11 +106,11 @@ func (c *Client) UnwrapKey(keyUrl string, wrappedKey []byte) ([]byte, error) {
 	}
 
 	// Send the request
-	return c.doWrapUnwrap(keyUrl+"/unwrapkey", wrappedKey)
+	return c.doWrapUnwrap(ctx, keyUrl+"/unwrapkey", wrappedKey)
 }
 
 // Internal function that performs wrap and unwrap operations on the keys
-func (c *Client) doWrapUnwrap(reqUrl string, key []byte) ([]byte, error) {
+func (c *Client) doWrapUnwrap(ctx context.Context, reqUrl string, key []byte) ([]byte, error) {
 	// Request body
 	// We need to encode the value ourselves using base64 URL-encoding
 	reqBodyData := struct {
@@ -125,7 +126,7 @@ func (c *Client) doWrapUnwrap(reqUrl string, key []byte) ([]byte, error) {
 	}
 
 	// Build the request
-	req, err := http.NewRequest("POST", reqUrl+"?api-version=7.2", bytes.NewReader(reqBody))
+	req, err := http.NewRequestWithContext(ctx, "POST", reqUrl+"?api-version=7.2", bytes.NewReader(reqBody))
 	if err != nil {
 		return nil, err
 	}

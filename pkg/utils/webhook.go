@@ -2,6 +2,7 @@ package utils
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,6 +16,8 @@ import (
 	"github.com/italypaleale/unlocker/pkg/config"
 )
 
+const timeout = 20 * time.Second
+
 // Webhook client
 type Webhook struct {
 	httpClient *http.Client
@@ -27,36 +30,39 @@ func (w *Webhook) Init(log *AppLogger) {
 
 	// Init a HTTP client
 	w.httpClient = &http.Client{
-		Timeout: 15 * time.Second,
+		Timeout: timeout,
 	}
 }
 
 // SendWebhook sends the notification
-func (w *Webhook) SendWebhook(data *WebhookRequest) (err error) {
+func (w *Webhook) SendWebhook(ctx context.Context, data *WebhookRequest) (err error) {
 	webhookUrl := viper.GetString(config.KeyWebhookUrl)
 
 	// Retry up to 3 times
 	const attempts = 3
 	for i := 0; i < attempts; i++ {
 		var req *http.Request
+		reqCtx, reqCancel := context.WithTimeout(ctx, timeout)
 		switch strings.ToLower(viper.GetString(config.KeyWebhookFormat)) {
 		case "slack":
-			req, err = w.prepareSlackRequest(webhookUrl, data)
+			req, err = w.prepareSlackRequest(reqCtx, webhookUrl, data)
 		case "discord":
 			// Shorthand for using Slack-compatible webhooks with Discord
 			if !strings.HasSuffix(webhookUrl, "/slack") {
 				webhookUrl += "/slack"
 			}
-			req, err = w.prepareSlackRequest(webhookUrl, data)
+			req, err = w.prepareSlackRequest(reqCtx, webhookUrl, data)
 		//case "plain":
 		default:
-			req, err = w.preparePlainRequest(webhookUrl, data)
+			req, err = w.preparePlainRequest(reqCtx, webhookUrl, data)
 		}
 		if err != nil {
+			reqCancel()
 			return err
 		}
 
 		res, err := w.httpClient.Do(req)
+		reqCancel()
 		if err != nil {
 			// Retry after 15 seconds on network failures
 			w.log.Raw().Warn().
@@ -96,7 +102,7 @@ func (w *Webhook) getLink(data *WebhookRequest) string {
 	return viper.GetString(config.KeyBaseUrl)
 }
 
-func (w *Webhook) preparePlainRequest(webhookUrl string, data *WebhookRequest) (req *http.Request, err error) {
+func (w *Webhook) preparePlainRequest(ctx context.Context, webhookUrl string, data *WebhookRequest) (req *http.Request, err error) {
 	// Format the message
 	message := fmt.Sprintf(
 		"Received a request to %s a key using key **%s** in vault **%s**.\n\n[Confirm request](%s)\n\n(Request ID: %s - Client IP: %s)",
@@ -109,7 +115,7 @@ func (w *Webhook) preparePlainRequest(webhookUrl string, data *WebhookRequest) (
 	)
 
 	// Create the request
-	req, err = http.NewRequest("POST", webhookUrl, strings.NewReader(message))
+	req, err = http.NewRequestWithContext(ctx, "POST", webhookUrl, strings.NewReader(message))
 	if err != nil {
 		return nil, err
 	}
@@ -123,7 +129,7 @@ func (w *Webhook) preparePlainRequest(webhookUrl string, data *WebhookRequest) (
 	return req, nil
 }
 
-func (w *Webhook) prepareSlackRequest(webhookUrl string, data *WebhookRequest) (req *http.Request, err error) {
+func (w *Webhook) prepareSlackRequest(ctx context.Context, webhookUrl string, data *WebhookRequest) (req *http.Request, err error) {
 	// Format the message
 	var note string
 	if data.Note != "" {
@@ -152,7 +158,7 @@ func (w *Webhook) prepareSlackRequest(webhookUrl string, data *WebhookRequest) (
 	}
 
 	// Create the request
-	req, err = http.NewRequest("POST", webhookUrl, buf)
+	req, err = http.NewRequestWithContext(ctx, "POST", webhookUrl, buf)
 	if err != nil {
 		return nil, err
 	}

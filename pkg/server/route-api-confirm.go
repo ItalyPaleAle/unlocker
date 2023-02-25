@@ -114,9 +114,9 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestSta
 	var output []byte
 	keyUrl := akv.KeyUrl(state.Vault, state.KeyId, state.KeyVersion)
 	if state.Operation == OperationWrap {
-		output, err = akv.WrapKey(keyUrl, state.Input)
+		output, err = akv.WrapKey(c.Request.Context(), keyUrl, state.Input)
 	} else if state.Operation == OperationUnwrap {
-		output, err = akv.UnwrapKey(keyUrl, state.Input)
+		output, err = akv.UnwrapKey(c.Request.Context(), keyUrl, state.Input)
 	}
 	if err != nil {
 		_ = c.Error(err)

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -77,7 +78,8 @@ func (s *Server) RouteWrapUnwrap(op requestOperation) gin.HandlerFunc {
 
 		// Invoke the webhook and send a message with the URL to unlock, in background
 		go func() {
-			webhookErr := s.webhook.SendWebhook(&utils.WebhookRequest{
+			// Use a background context so it's not tied to the incoming request
+			webhookErr := s.webhook.SendWebhook(context.Background(), &utils.WebhookRequest{
 				OperationName: op.String(),
 				KeyId:         req.KeyId,
 				Vault:         req.Vault,
