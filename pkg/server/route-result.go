@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/italypaleale/unlocker/utils"
+	"github.com/italypaleale/unlocker/pkg/utils"
 )
 
 // RouteResult is the handler for the GET /result/:state request

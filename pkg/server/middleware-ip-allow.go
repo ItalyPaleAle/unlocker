@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
 
-	"github.com/italypaleale/unlocker/config"
+	"github.com/italypaleale/unlocker/pkg/config"
 )
 
 // AllowIpMiddleware is a middleware that allows requests from certain IPs only

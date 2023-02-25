@@ -16,8 +16,8 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/viper"
 
-	"github.com/italypaleale/unlocker/config"
-	"github.com/italypaleale/unlocker/utils"
+	"github.com/italypaleale/unlocker/pkg/config"
+	"github.com/italypaleale/unlocker/pkg/utils"
 )
 
 // Server is the server based on Gin

@@ -15,10 +15,10 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/italypaleale/unlocker/client"
-	"github.com/italypaleale/unlocker/config"
+	"github.com/italypaleale/unlocker/pkg/config"
 )
 
-//go:generate ../client/build.sh
+//go:generate ../../client/build.sh
 
 const staticBaseDir = "dist"
 

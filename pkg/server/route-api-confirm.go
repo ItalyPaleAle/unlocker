@@ -8,7 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/italypaleale/unlocker/keyvault"
+	"github.com/italypaleale/unlocker/pkg/keyvault"
 )
 
 // RouteApiConfirmPost is the handler for the POST /api/confirm request

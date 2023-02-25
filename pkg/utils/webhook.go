@@ -12,7 +12,7 @@ import (
 
 	"github.com/spf13/viper"
 
-	"github.com/italypaleale/unlocker/config"
+	"github.com/italypaleale/unlocker/pkg/config"
 )
 
 // Webhook client

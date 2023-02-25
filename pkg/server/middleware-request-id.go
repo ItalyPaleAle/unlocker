@@ -6,8 +6,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/italypaleale/unlocker/config"
 	"github.com/spf13/viper"
+
+	"github.com/italypaleale/unlocker/pkg/config"
 )
 
 // RequestIdMiddleware is a middleware that generates a unique request ID for each request

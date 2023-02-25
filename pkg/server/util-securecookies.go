@@ -12,7 +12,7 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/spf13/viper"
 
-	"github.com/italypaleale/unlocker/config"
+	"github.com/italypaleale/unlocker/pkg/config"
 )
 
 const jwtIssuer = "unlocker"
