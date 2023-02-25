@@ -17,6 +17,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/italypaleale/unlocker/pkg/config"
+	"github.com/italypaleale/unlocker/pkg/metrics"
 	"github.com/italypaleale/unlocker/pkg/utils"
 )
 
@@ -28,7 +29,7 @@ type Server struct {
 	states     map[string]*requestState
 	lock       *sync.RWMutex
 	webhook    *utils.Webhook
-	metrics    unlockerMetrics
+	metrics    metrics.UnlockerMetrics
 	// Subscribers that receive public events
 	pubsub *utils.Broker[*requestStatePublic]
 	// Subscriptions to watch for state changes

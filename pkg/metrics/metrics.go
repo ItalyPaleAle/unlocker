@@ -1,4 +1,4 @@
-package server
+package metrics
 
 import (
 	"time"
@@ -7,13 +7,13 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
 
-type unlockerMetrics struct {
+type UnlockerMetrics struct {
 	requests *prometheus.CounterVec
 	results  *prometheus.CounterVec
 	latency  *prometheus.SummaryVec
 }
 
-func (m *unlockerMetrics) Init() {
+func (m *UnlockerMetrics) Init() {
 	m.requests = promauto.NewCounterVec(prometheus.CounterOpts{
 		Name: "unlocker_requests_total",
 		Help: "The total number of requests per operation per key",
@@ -30,19 +30,19 @@ func (m *unlockerMetrics) Init() {
 	}, []string{"vault"})
 }
 
-func (m unlockerMetrics) RecordRequest(operation string, key string) {
+func (m UnlockerMetrics) RecordRequest(operation string, key string) {
 	m.requests.
 		WithLabelValues(operation, key).
 		Inc()
 }
 
-func (m unlockerMetrics) RecordResult(status string) {
+func (m UnlockerMetrics) RecordResult(status string) {
 	m.results.
 		WithLabelValues(status).
 		Inc()
 }
 
-func (m unlockerMetrics) RecordLatency(vault string, latency time.Duration) {
+func (m UnlockerMetrics) RecordLatency(vault string, latency time.Duration) {
 	m.latency.
 		WithLabelValues(vault).
 		Observe(float64(latency.Microseconds()) / 1000)
