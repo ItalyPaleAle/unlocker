@@ -127,7 +127,8 @@ jobs:
           GOARCH=amd64 \
             go build \
               -ldflags "${BUILD_LDFLAGS}" \
-              -o .bin/unlocker-${{ env.BUILD_ID }}-linux-amd64/unlocker
+              -o .bin/unlocker-${{ env.BUILD_ID }}-linux-amd64/unlocker \
+              ./cmd/unlocker
           cp LICENSE.md .bin/unlocker-${{ env.BUILD_ID }}-linux-amd64
           cp README.md .bin/unlocker-${{ env.BUILD_ID }}-linux-amd64
           (cd .bin && tar -czvf ../.out/unlocker-${{ env.BUILD_ID }}-linux-amd64.tar.gz unlocker-${{ env.BUILD_ID }}-linux-amd64)
@@ -138,7 +139,8 @@ jobs:
           GOARCH=386 \
             go build \
               -ldflags "${BUILD_LDFLAGS}" \
-              -o .bin/unlocker-${{ env.BUILD_ID }}-linux-386/unlocker
+              -o .bin/unlocker-${{ env.BUILD_ID }}-linux-386/unlocker \
+              ./cmd/unlocker
           cp LICENSE.md .bin/unlocker-${{ env.BUILD_ID }}-linux-386
           cp README.md .bin/unlocker-${{ env.BUILD_ID }}-linux-386
           (cd .bin && tar -czvf ../.out/unlocker-${{ env.BUILD_ID }}-linux-386.tar.gz unlocker-${{ env.BUILD_ID }}-linux-386)
@@ -149,7 +151,8 @@ jobs:
           GOARCH=arm64 \
             go build \
               -ldflags "${BUILD_LDFLAGS}" \
-              -o .bin/unlocker-${{ env.BUILD_ID }}-linux-arm64/unlocker
+              -o .bin/unlocker-${{ env.BUILD_ID }}-linux-arm64/unlocker \
+              ./cmd/unlocker
           cp LICENSE.md .bin/unlocker-${{ env.BUILD_ID }}-linux-arm64
           cp README.md .bin/unlocker-${{ env.BUILD_ID }}-linux-arm64
           (cd .bin && tar -czvf ../.out/unlocker-${{ env.BUILD_ID }}-linux-arm64.tar.gz unlocker-${{ env.BUILD_ID }}-linux-arm64)
@@ -161,7 +164,8 @@ jobs:
           GOARM=7 \
             go build \
               -ldflags "${BUILD_LDFLAGS}" \
-              -o .bin/unlocker-${{ env.BUILD_ID }}-linux-armv7/unlocker
+              -o .bin/unlocker-${{ env.BUILD_ID }}-linux-armv7/unlocker \
+              ./cmd/unlocker
           cp LICENSE.md .bin/unlocker-${{ env.BUILD_ID }}-linux-armv7
           cp README.md .bin/unlocker-${{ env.BUILD_ID }}-linux-armv7
           (cd .bin && tar -czvf ../.out/unlocker-${{ env.BUILD_ID }}-linux-armv7.tar.gz unlocker-${{ env.BUILD_ID }}-linux-armv7)
@@ -172,7 +176,8 @@ jobs:
           GOARCH=amd64 \
             go build \
               -ldflags "${BUILD_LDFLAGS}" \
-              -o .bin/unlocker-${{ env.BUILD_ID }}-macos-x64/unlocker
+              -o .bin/unlocker-${{ env.BUILD_ID }}-macos-x64/unlocker \
+              ./cmd/unlocker
           cp LICENSE.md .bin/unlocker-${{ env.BUILD_ID }}-macos-x64
           cp README.md .bin/unlocker-${{ env.BUILD_ID }}-macos-x64
           (cd .bin && tar -czvf ../.out/unlocker-${{ env.BUILD_ID }}-macos-x64.tar.gz unlocker-${{ env.BUILD_ID }}-macos-x64)
@@ -183,7 +188,8 @@ jobs:
           GOARCH=arm64 \
             go build \
               -ldflags "${BUILD_LDFLAGS}" \
-              -o .bin/unlocker-${{ env.BUILD_ID }}-macos-arm64/unlocker
+              -o .bin/unlocker-${{ env.BUILD_ID }}-macos-arm64/unlocker \
+              ./cmd/unlocker
           cp LICENSE.md .bin/unlocker-${{ env.BUILD_ID }}-macos-arm64
           cp README.md .bin/unlocker-${{ env.BUILD_ID }}-macos-arm64
           (cd .bin && tar -czvf ../.out/unlocker-${{ env.BUILD_ID }}-macos-arm64.tar.gz unlocker-${{ env.BUILD_ID }}-macos-arm64)
