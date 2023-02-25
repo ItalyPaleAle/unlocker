@@ -32,5 +32,5 @@ func init() {
 func (s *Server) RouteHealthzHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	w.Write(routeHealthzResponse)
+	_, _ = w.Write(routeHealthzResponse)
 }

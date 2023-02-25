@@ -41,10 +41,6 @@ type AccessToken struct {
 	ErrorDescription string `json:"error_description"`
 }
 
-type routeApiAuthResponse struct {
-	URL string `json:"url"`
-}
-
 // RouteAuth is the handler for the GET /auth request
 // This redirects the user to the page where they can sign in
 func (s *Server) RouteAuth(c *gin.Context) {

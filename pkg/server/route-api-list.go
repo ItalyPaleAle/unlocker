@@ -60,7 +60,7 @@ func (s *Server) routeApiListGetStream(c *gin.Context) {
 		}
 	}
 	if timeout == nil {
-		c.Error(errors.New("request did not contain a valid session TTL in context"))
+		_ = c.Error(errors.New("request did not contain a valid session TTL in context"))
 		c.AbortWithStatusJSON(http.StatusInternalServerError, InternalServerError)
 		return
 	}
@@ -82,13 +82,13 @@ func (s *Server) routeApiListGetStream(c *gin.Context) {
 			continue
 		}
 		sent = true
-		enc.Encode(state.Public(stateId))
+		_ = enc.Encode(state.Public(stateId))
 	}
 
 	// Subscribe to receive new events
 	events, err := s.pubsub.Subscribe()
 	if err != nil {
-		c.Error(fmt.Errorf("error subscribing to events: %v", err))
+		_ = c.Error(fmt.Errorf("error subscribing to events: %v", err))
 		c.AbortWithStatusJSON(http.StatusInternalServerError, InternalServerError)
 		s.lock.Unlock()
 		return
@@ -99,7 +99,7 @@ func (s *Server) routeApiListGetStream(c *gin.Context) {
 
 	// If we haven't sent any record yet, send an empty line so the client receives a byte
 	if !sent {
-		c.Writer.Write([]byte{0x0A})
+		_, _ = c.Writer.Write([]byte{0x0A})
 	}
 
 	// Send any data to the client
@@ -127,7 +127,7 @@ func (s *Server) routeApiListGetStream(c *gin.Context) {
 		case msg, more := <-events:
 			// Encode the event and add it to the buffer
 			if msg != nil {
-				enc.Encode(msg)
+				_ = enc.Encode(msg)
 				hasData = true
 			}
 			// If the channel is closed, return

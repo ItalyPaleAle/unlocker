@@ -212,7 +212,7 @@ func setCookieKeys() {
 			AnErr("error", err).
 			Msg("Failed to import cookieEncryptionKey as jwk.Key")
 	}
-	cek.Set("kid", kid)
+	_ = cek.Set("kid", kid)
 	viper.Set(config.KeyInternalCookieEncryptionKey, cek)
 
 	csk, err := jwk.FromRaw(cskRaw)
@@ -221,7 +221,7 @@ func setCookieKeys() {
 			AnErr("error", err).
 			Msg("Failed to import cookieSigningKey as jwk.Key")
 	}
-	csk.Set("kid", kid)
+	_ = csk.Set("kid", kid)
 	viper.Set(config.KeyInternalCookieSigningKey, csk)
 }
 
