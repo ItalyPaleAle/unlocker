@@ -110,7 +110,7 @@ func (s *Server) initAppServer() error {
 	s.router.Use(cors.New(corsConfig))
 
 	// Logger middleware that removes the auth code from the URL
-	codeFilterLogMw := s.log.LoggerMaskMiddleware(regexp.MustCompile(`(\?|&)(code=)([^&]*)`), "$1$2***")
+	codeFilterLogMw := s.log.LoggerMaskMiddleware(regexp.MustCompile(`(\?|&)(code|state|session_state)=([^&]*)`), "$1$2***")
 
 	// Middleware to allow certain IPs
 	allowIpMw, err := s.AllowIpMiddleware()

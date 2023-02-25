@@ -181,7 +181,7 @@ func (s *Server) requestAccessToken(ctx context.Context, code string) (*AccessTo
 }
 
 func createStateToken(c *gin.Context) (stateToken string, seed string, err error) {
-	tokenSigningKey := viper.GetString(config.KeyTokenSigningKey)
+	tokenSigningKey := viper.GetString(config.KeyInternalTokenSigningKey)
 	if tokenSigningKey == "" {
 		// Should never happen
 		return "", "", errors.New("tokenSigningKey is empty in the configuration")
@@ -206,7 +206,7 @@ func createStateToken(c *gin.Context) (stateToken string, seed string, err error
 }
 
 func validateStateToken(c *gin.Context, stateToken string, seed string) bool {
-	tokenSigningKey := viper.GetString(config.KeyTokenSigningKey)
+	tokenSigningKey := viper.GetString(config.KeyInternalTokenSigningKey)
 	if tokenSigningKey == "" {
 		// Should never happen
 		return false

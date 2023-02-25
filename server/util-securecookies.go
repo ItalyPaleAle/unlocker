@@ -6,8 +6,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/go-jose/go-jose/v3"
-	"github.com/go-jose/go-jose/v3/jwt"
+	"github.com/lestrrat-go/jwx/v2/jwa"
+	"github.com/lestrrat-go/jwx/v2/jwe"
+	"github.com/lestrrat-go/jwx/v2/jwk"
+	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/spf13/viper"
 
 	"github.com/italypaleale/unlocker/config"
@@ -16,9 +18,13 @@ import (
 const jwtIssuer = "unlocker"
 
 func getSecureCookie(c *gin.Context, name string) (plaintextValue string, ttl time.Duration, err error) {
-	key, ok := viper.Get(config.KeyCookieEncryptionKey).([]byte)
-	if !ok || len(key) != 16 {
+	cek, ok := viper.Get(config.KeyInternalCookieEncryptionKey).(jwk.Key)
+	if !ok || cek == nil {
 		return "", 0, errors.New("empty or invalid cookieEncryptionKey in the configuration")
+	}
+	csk, ok := viper.Get(config.KeyInternalCookieSigningKey).(jwk.Key)
+	if !ok || csk == nil {
+		return "", 0, errors.New("empty or invalid cookie signing key in the configuration")
 	}
 
 	// Get the cookie
@@ -30,38 +36,28 @@ func getSecureCookie(c *gin.Context, name string) (plaintextValue string, ttl ti
 		return "", 0, fmt.Errorf("cookie %s is empty", name)
 	}
 
-	// Parse the encrypted JWT in the cookie
-	token, err := jwt.ParseEncrypted(cookieValue)
+	// Decrypt the encrypted JWE
+	dec, err := jwe.Decrypt([]byte(cookieValue),
+		jwe.WithKey(jwa.A128KW, cek),
+	)
 	if err != nil {
-		return "", 0, err
-	}
-	c1 := jwt.Claims{}
-	c2 := map[string]interface{}{}
-	err = token.Claims(key, &c1, &c2)
-	if err != nil {
-		return "", 0, err
+		return "", 0, fmt.Errorf("failed to decrypt token in cookie: %w", err)
 	}
 
-	// Validate the claims
-	if c1.Issuer != jwtIssuer {
-		return "", 0, errors.New("invalid value for 'iss' claim")
+	// Parse the encrypted JWT in the cookie
+	token, err := jwt.Parse(dec,
+		jwt.WithAcceptableSkew(30*time.Second),
+		jwt.WithIssuer(jwtIssuer),
+		jwt.WithAudience(viper.GetString(config.KeyAzureClientId)),
+		jwt.WithKey(jwa.HS256, csk),
+	)
+	if err != nil {
+		return "", 0, fmt.Errorf("failed to parse JWT: %w", err)
 	}
-	if len(c1.Audience) != 1 || c1.Audience[0] != viper.GetString(config.KeyAzureClientId) {
-		return "", 0, errors.New("invalid value for 'aud' claim")
-	}
-	now := time.Now()
-	if c1.NotBefore == nil || c1.NotBefore.Time().After(now) {
-		return "", 0, errors.New("invalid value for 'nbf' claim")
-	}
-	if c1.Expiry == nil {
-		return "", 0, errors.New("invalid value for 'exp' claim")
-	}
-	ttl = c1.Expiry.Time().Sub(now)
-	if ttl < 0 {
-		return "", 0, errors.New("invalid value for 'exp' claim")
-	}
+
+	// Validate the presence of the "v" claim
 	var v string
-	if vI, ok := c2["v"]; ok {
+	if vI, ok := token.Get("v"); ok {
 		v, ok = vI.(string)
 		if !ok {
 			v = ""
@@ -71,53 +67,54 @@ func getSecureCookie(c *gin.Context, name string) (plaintextValue string, ttl ti
 		return "", 0, errors.New("invalid value for 'v' claim")
 	}
 
+	// Get the TTL
+	ttl = time.Until(token.Expiration())
+
 	return v, ttl, nil
 }
 
 func setSecureCookie(c *gin.Context, name string, plaintextValue string, maxAge int, path string, domain string, secureCookie bool, httpOnly bool) error {
-	key, ok := viper.Get(config.KeyCookieEncryptionKey).([]byte)
-	if !ok || len(key) != 16 {
+	cek, ok := viper.Get(config.KeyInternalCookieEncryptionKey).(jwk.Key)
+	if !ok || cek == nil {
 		return errors.New("empty or invalid cookieEncryptionKey in the configuration")
+	}
+	csk, ok := viper.Get(config.KeyInternalCookieSigningKey).(jwk.Key)
+	if !ok || csk == nil {
+		return errors.New("empty or invalid cookie signing key in the configuration")
 	}
 
 	// Claims for the JWT
 	now := time.Now()
-	c1 := jwt.Claims{
-		Issuer: jwtIssuer,
-		Audience: jwt.Audience{
+	token, err := jwt.NewBuilder().
+		Issuer(jwtIssuer).
+		Audience([]string{
 			// Use the Azure client ID as our audience too
 			viper.GetString(config.KeyAzureClientId),
-		},
+		}).
+		IssuedAt(now).
 		// Add 1 extra second to synchronize with cookie expiry
-		Expiry:    jwt.NewNumericDate(now.Add(time.Duration(maxAge+1) * time.Second)),
-		NotBefore: jwt.NewNumericDate(now),
-	}
-	c2 := map[string]interface{}{
-		"v": plaintextValue,
+		Expiration(now.Add(time.Duration(maxAge+1)*time.Second)).
+		NotBefore(now).
+		Claim("v", plaintextValue).
+		Build()
+	if err != nil {
+		return fmt.Errorf("failed to build JWT: %w", err)
 	}
 
 	// Generate and encrypt the JWT
-	enc, err := jose.NewEncrypter(
-		jose.A128GCM,
-		jose.Recipient{
-			Algorithm: jose.DIRECT,
-			Key:       key,
-		},
-		(&jose.EncrypterOptions{}).WithType("JWT"),
-	)
+	cookieValue, err := jwt.NewSerializer().
+		Sign(jwt.WithKey(jwa.HS256, csk)).
+		Encrypt(
+			jwt.WithKey(jwa.A128KW, cek),
+			jwt.WithEncryptOption(jwe.WithContentEncryption(jwa.A128GCM)),
+		).
+		Serialize(token)
 	if err != nil {
-		return err
-	}
-	cookieValue, err := jwt.Encrypted(enc).
-		Claims(c1).
-		Claims(c2).
-		CompactSerialize()
-	if err != nil {
-		return err
+		return fmt.Errorf("failed to serialize token: %w", err)
 	}
 
 	// Set the cookie
-	c.SetCookie(name, cookieValue, maxAge, "/", c.Request.URL.Host, secureCookie, true)
+	c.SetCookie(name, string(cookieValue), maxAge, "/", c.Request.URL.Host, secureCookie, true)
 
 	return nil
 }

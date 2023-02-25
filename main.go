@@ -2,8 +2,11 @@ package main
 
 import (
 	"context"
+	"crypto"
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha256"
+	"encoding/base64"
 	"errors"
 	"io"
 	"os"
@@ -11,6 +14,7 @@ import (
 	"path/filepath"
 	"syscall"
 
+	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
 
@@ -153,26 +157,76 @@ func loadConfig() {
 				Msg("Failed to generate random tokenSigningKey")
 		}
 
-		viper.Set(config.KeyTokenSigningKey, tokenSigningKey)
+		viper.Set(config.KeyInternalTokenSigningKey, tokenSigningKey)
 	}
 
-	// If we have cookieEncryptionKey set, derive a 128-bit key from that
-	// Otherwise, generate a random 128-bit key
-	var cek []byte
+	// Set the cookie keys
+	// This panics in case of errors
+	setCookieKeys()
+}
+
+// Sets the cookie encryption and signing keys
+func setCookieKeys() {
+	// If we have cookieEncryptionKey set, derive the keys from that
+	// Otherwise, generate the keys randomly
+	var (
+		// Cookie Encryption Key, 128-bit (for AES-KW)
+		cekRaw []byte
+		// Cookie Signing Key, 256-bit (for HMAC-SHA256)
+		cskRaw []byte
+	)
 	cekStr := viper.GetString(config.KeyCookieEncryptionKey)
 	if cekStr != "" {
-		h := sha256.Sum256([]byte(cekStr))
-		cek = h[:]
+		h := hmac.New(crypto.SHA384.New, []byte(cekStr))
+		h.Write([]byte("unlocker-cookie-keys"))
+		sum := h.Sum(nil)
+		cekRaw = sum[0:16]
+		cskRaw = sum[16:]
 	} else {
 		appLogger.Raw().Info().Msg("No 'cookieEncryptionKey' found in the configuration: a random one will be generated")
 
-		cek = make([]byte, 16)
-		_, err := io.ReadFull(rand.Reader, cek)
+		cekRaw = make([]byte, 16)
+		_, err := io.ReadFull(rand.Reader, cekRaw)
+		if err != nil {
+			appLogger.Raw().Fatal().
+				AnErr("error", err).
+				Msg("Failed to generate random cookieEncryptionKey")
+		}
+
+		cskRaw = make([]byte, 32)
+		_, err = io.ReadFull(rand.Reader, cekRaw)
 		if err != nil {
 			appLogger.Raw().Fatal().
 				AnErr("error", err).
 				Msg("Failed to generate random cookieEncryptionKey")
 		}
 	}
-	viper.Set(config.KeyCookieEncryptionKey, cek)
+
+	// Calculate the key ID
+	kid := computeKeyId(cskRaw)
+
+	// Import the keys as JWKs
+	cek, err := jwk.FromRaw(cekRaw)
+	if err != nil {
+		appLogger.Raw().Fatal().
+			AnErr("error", err).
+			Msg("Failed to import cookieEncryptionKey as jwk.Key")
+	}
+	cek.Set("kid", kid)
+	viper.Set(config.KeyInternalCookieEncryptionKey, cek)
+
+	csk, err := jwk.FromRaw(cskRaw)
+	if err != nil {
+		appLogger.Raw().Fatal().
+			AnErr("error", err).
+			Msg("Failed to import cookieSigningKey as jwk.Key")
+	}
+	csk.Set("kid", kid)
+	viper.Set(config.KeyInternalCookieSigningKey, csk)
+}
+
+// Returns the key ID from a key
+func computeKeyId(k []byte) string {
+	h := sha256.Sum256(k)
+	return base64.RawURLEncoding.EncodeToString(h[0:12])
 }

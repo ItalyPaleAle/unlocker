@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	jwt "github.com/golang-jwt/jwt/v4"
 	"github.com/rs/zerolog"
 )
 
@@ -39,15 +38,6 @@ func (a *AppLogger) Log(c *gin.Context) *zerolog.Logger {
 	// Add parameters
 	lctx := a.log.With().
 		Str("reqId", c.GetString("request-id"))
-
-	// Check if we have a user
-	user, email := a.getUser(c)
-	if user != "" {
-		lctx = lctx.Str("user", user)
-	}
-	if email != "" {
-		lctx = lctx.Str("email", email)
-	}
 
 	// Return the logger
 	logger := lctx.Logger()
@@ -102,15 +92,6 @@ func (a *AppLogger) LoggerMiddleware(c *gin.Context) {
 		event = event.Str("error", c.Errors.Last().Error())
 	}
 
-	// Check if we have a user
-	user, email := a.getUser(c)
-	if user != "" {
-		event = event.Str("user", user)
-	}
-	if email != "" {
-		event = event.Str("email", email)
-	}
-
 	// Check if we have a message
 	msg := c.GetString("log-message")
 
@@ -142,40 +123,4 @@ func (a *AppLogger) LoggerMaskMiddleware(exp *regexp.Regexp, replace string) gin
 			return exp.ReplaceAllString(path, replace)
 		})
 	}
-}
-
-// Returns the user ID and email from the claims (if present)
-func (a *AppLogger) getUser(c *gin.Context) (string, string) {
-	// Get the user from the claims
-	user, ok := c.Get("claims")
-	if !ok {
-		return "", ""
-	}
-	claims, ok := user.(jwt.MapClaims)
-	if !ok || len(claims) == 0 {
-		return "", ""
-	}
-
-	// Sub
-	sub, ok := claims["sub"]
-	if !ok {
-		return "", ""
-	}
-	subStr, ok := sub.(string)
-	if !ok {
-		return "", ""
-	}
-
-	// Email
-	var emailStr string
-	email, ok := claims["email"]
-	if ok {
-		emailStr, ok = email.(string)
-		if !ok {
-			emailStr = ""
-		}
-	}
-
-	// Result
-	return subStr, emailStr
 }

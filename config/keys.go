@@ -23,5 +23,11 @@ const (
 	KeyWebhookKey             = "webhookKey"
 	KeyWebhookUrl             = "webhookUrl"
 
+	// Keys starting with "dev." are undocumented and meant for development only
 	KeyDevClientProxyServer = "dev.clientProxyServer"
+
+	// Key starting with "internal." are set by the app at startup
+	KeyInternalTokenSigningKey     = "internal.tokenSigningKey"
+	KeyInternalCookieEncryptionKey = "internal.cookieEncryptionKey"
+	KeyInternalCookieSigningKey    = "internal.cookieSigningKey"
 )
