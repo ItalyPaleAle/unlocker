@@ -3,6 +3,7 @@ package server
 import (
 	"errors"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -30,6 +31,9 @@ func getSecureCookie(c *gin.Context, name string) (plaintextValue string, ttl ti
 	// Get the cookie
 	cookieValue, err := c.Cookie(name)
 	if err != nil {
+		if errors.Is(err, http.ErrNoCookie) {
+			return "", 0, nil
+		}
 		return "", 0, err
 	}
 	if cookieValue == "" {
