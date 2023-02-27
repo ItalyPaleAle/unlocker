@@ -23,7 +23,7 @@ import (
 
 // Server is the server based on Gin
 type Server struct {
-	router     *gin.Engine
+	appRouter  *gin.Engine
 	httpClient *http.Client
 	log        *utils.AppLogger
 	states     map[string]*requestState
@@ -31,7 +31,9 @@ type Server struct {
 	webhook    *utils.Webhook
 	metrics    metrics.UnlockerMetrics
 	// Subscribers that receive public events
-	pubsub *utils.Broker[*requestStatePublic]
+	pubsub     *utils.Broker[*requestStatePublic]
+	appSrv     *http.Server
+	metricsSrv *http.Server
 	// Subscriptions to watch for state changes
 	// Each state can only have one subscription
 	// If another call tries to subscribe to the same state, it will evict the first call
@@ -72,10 +74,10 @@ func (s *Server) Init(log *utils.AppLogger) error {
 
 func (s *Server) initAppServer() error {
 	// Create the Gin router and add various middlewares
-	s.router = gin.New()
-	s.router.Use(gin.Recovery())
-	s.router.Use(s.RequestIdMiddleware)
-	s.router.Use(s.log.LoggerMiddleware)
+	s.appRouter = gin.New()
+	s.appRouter.Use(gin.Recovery())
+	s.appRouter.Use(s.RequestIdMiddleware)
+	s.appRouter.Use(s.log.LoggerMiddleware)
 
 	// CORS configuration
 	corsConfig := cors.Config{
@@ -108,7 +110,7 @@ func (s *Server) initAppServer() error {
 		corsConfig.AllowAllOrigins = false
 		corsConfig.AllowOrigins = strings.Split(originsStr, ",")
 	}
-	s.router.Use(cors.New(corsConfig))
+	s.appRouter.Use(cors.New(corsConfig))
 
 	// Logger middleware that removes the auth code from the URL
 	codeFilterLogMw := s.log.LoggerMaskMiddleware(regexp.MustCompile(`(\?|&)(code|state|session_state)=([^&]*)`), "$1$2***")
@@ -120,51 +122,35 @@ func (s *Server) initAppServer() error {
 	}
 
 	// Add routes
-	s.router.GET("/healthz", gin.WrapF(s.RouteHealthzHandler))
-	s.router.POST("/wrap", allowIpMw, s.RouteWrapUnwrap(OperationWrap))
-	s.router.POST("/unwrap", allowIpMw, s.RouteWrapUnwrap(OperationUnwrap))
-	s.router.GET("/result/:state", allowIpMw, s.RouteResult)
-	s.router.GET("/auth", s.RouteAuth)
-	s.router.GET("/auth/confirm", codeFilterLogMw, s.RouteAuthConfirm)
-	s.router.GET("/api/list", s.AccessTokenMiddleware(true), s.RouteApiListGet)
-	s.router.POST("/api/confirm", s.AccessTokenMiddleware(true), s.RouteApiConfirmPost)
+	s.appRouter.GET("/healthz", gin.WrapF(s.RouteHealthzHandler))
+	s.appRouter.POST("/wrap", allowIpMw, s.RouteWrapUnwrap(OperationWrap))
+	s.appRouter.POST("/unwrap", allowIpMw, s.RouteWrapUnwrap(OperationUnwrap))
+	s.appRouter.GET("/result/:state", allowIpMw, s.RouteResult)
+	s.appRouter.GET("/auth", s.RouteAuth)
+	s.appRouter.GET("/auth/confirm", codeFilterLogMw, s.RouteAuthConfirm)
+	s.appRouter.GET("/api/list", s.AccessTokenMiddleware(true), s.RouteApiListGet)
+	s.appRouter.POST("/api/confirm", s.AccessTokenMiddleware(true), s.RouteApiConfirmPost)
 
 	// Static files as fallback
-	s.router.NoRoute(s.serveClient())
+	s.appRouter.NoRoute(s.serveClient())
 
 	return nil
 }
 
 // Start the web server
-// Note this function is blocking, and will return only when the servers are shut down (via context cancellation or via SIGINT/SIGTERM signals)
+// Note this function is blocking, and will return only when the servers are shut down via context cancellation.
 func (s *Server) Start(ctx context.Context) error {
 	// App server
-	appBindAddr := viper.GetString(config.KeyBind)
-	if appBindAddr == "" {
-		appBindAddr = "0.0.0.0"
-	}
-	appBindPort := viper.GetInt(config.KeyPort)
-	if appBindPort == 0 {
-		appBindPort = 8080
-	}
-	appSrv, err := s.startAppServer(appBindAddr, appBindPort)
+	err := s.startAppServer()
 	if err != nil {
 		return err
 	}
 
 	// Metrics server
-	var metricsSrv *http.Server
 	if viper.GetBool(config.KeyEnableMetrics) {
-		metricsBindAddr := viper.GetString(config.KeyMetricsBind)
-		if metricsBindAddr == "" {
-			metricsBindAddr = "0.0.0.0"
-		}
-		metricsBindPort := viper.GetInt(config.KeyMetricsPort)
-		if metricsBindPort == 0 {
-			metricsBindPort = 2112
-		}
-		metricsSrv, err = s.startMetricsServer(metricsBindAddr, metricsBindPort)
+		err = s.startMetricsServer()
 		if err != nil {
+			_ = s.stopAppServer()
 			return err
 		}
 	}
@@ -174,38 +160,32 @@ func (s *Server) Start(ctx context.Context) error {
 
 	// We received an interrupt signal, shut down the servers
 	s.pubsub.Shutdown()
-	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
-	err = appSrv.Shutdown(shutdownCtx)
-	shutdownCancel()
-	if err != nil {
-		// Log the error only (could be context canceled)
-		s.log.Raw().Warn().
-			AnErr("error", err).
-			Msg("App server shutdown error")
-	}
 
-	shutdownCtx, shutdownCancel = context.WithTimeout(context.Background(), time.Second)
-	err = metricsSrv.Shutdown(shutdownCtx)
-	shutdownCancel()
-	if err != nil {
-		// Log the error only (could be context canceled)
-		s.log.Raw().Warn().
-			AnErr("error", err).
-			Msg("Metrics server shutdown error")
-	}
+	// Ignore the returned errors
+	_ = s.stopAppServer()
+	_ = s.stopMetricsServer()
 
 	return nil
 }
 
-func (s *Server) startAppServer(bindAddr string, bindPort int) (*http.Server, error) {
+func (s *Server) startAppServer() error {
+	bindAddr := viper.GetString(config.KeyBind)
+	if bindAddr == "" {
+		bindAddr = "0.0.0.0"
+	}
+	bindPort := viper.GetInt(config.KeyPort)
+	if bindPort < 1 {
+		bindPort = 8080
+	}
+
 	// Create the HTTPS server
 	tlsCert, err := s.loadTLSCert()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	httpSrv := &http.Server{
+	s.appSrv = &http.Server{
 		Addr:              net.JoinHostPort(bindAddr, strconv.Itoa(bindPort)),
-		Handler:           s.router,
+		Handler:           s.appRouter,
 		MaxHeaderBytes:    1 << 20,
 		ReadHeaderTimeout: 10 * time.Second,
 		TLSConfig: &tls.Config{
@@ -222,23 +202,46 @@ func (s *Server) startAppServer(bindAddr string, bindPort int) (*http.Server, er
 			Str("url", viper.GetString(config.KeyBaseUrl)).
 			Msg("App server started")
 		// Next call blocks until the server is shut down
-		err := httpSrv.ListenAndServeTLS("", "")
+		err := s.appSrv.ListenAndServeTLS("", "")
 		if err != http.ErrServerClosed {
 			s.log.Raw().Panic().Msgf("Error starting app server: %v", err)
 		}
 	}()
 
-	return httpSrv, nil
+	return nil
 }
 
-func (s *Server) startMetricsServer(bindAddr string, bindPort int) (*http.Server, error) {
+func (s *Server) stopAppServer() error {
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
+	err := s.appSrv.Shutdown(shutdownCtx)
+	shutdownCancel()
+	if err != nil {
+		// Log the error only (could be context canceled)
+		s.log.Raw().Warn().
+			AnErr("error", err).
+			Msg("App server shutdown error")
+		return err
+	}
+	return nil
+}
+
+func (s *Server) startMetricsServer() error {
+	bindAddr := viper.GetString(config.KeyMetricsBind)
+	if bindAddr == "" {
+		bindAddr = "0.0.0.0"
+	}
+	bindPort := viper.GetInt(config.KeyMetricsPort)
+	if bindPort < 1 {
+		bindPort = 2112
+	}
+
 	// Handler
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", s.RouteHealthzHandler)
 	mux.Handle("/metrics", promhttp.Handler())
 
 	// Create the HTTP server
-	httpSrv := &http.Server{
+	s.metricsSrv = &http.Server{
 		Addr:              net.JoinHostPort(bindAddr, strconv.Itoa(bindPort)),
 		Handler:           mux,
 		MaxHeaderBytes:    1 << 20,
@@ -251,13 +254,27 @@ func (s *Server) startMetricsServer(bindAddr string, bindPort int) (*http.Server
 			Int("port", bindPort).
 			Msg("Metrics server started")
 		// Next call blocks until the server is shut down
-		err := httpSrv.ListenAndServe()
+		err := s.metricsSrv.ListenAndServe()
 		if err != http.ErrServerClosed {
 			s.log.Raw().Panic().Msgf("Error starting metrics server: %v", err)
 		}
 	}()
 
-	return httpSrv, nil
+	return nil
+}
+
+func (s *Server) stopMetricsServer() error {
+	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	err := s.metricsSrv.Shutdown(shutdownCtx)
+	shutdownCancel()
+	if err != nil {
+		// Log the error only (could be context canceled)
+		s.log.Raw().Warn().
+			AnErr("error", err).
+			Msg("Metrics server shutdown error")
+		return err
+	}
+	return nil
 }
 
 // Adds a subscription to a state by key
