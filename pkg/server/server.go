@@ -209,7 +209,7 @@ func (s *Server) startAppServer() error {
 		// Next call blocks until the server is shut down
 		err := s.appSrv.ListenAndServeTLS("", "")
 		if err != http.ErrServerClosed {
-			s.log.Raw().Panic().Msgf("Error starting app server: %v", err)
+			s.log.Raw().Fatal().Msgf("Error starting app server: %v", err)
 		}
 	}()
 
@@ -262,7 +262,7 @@ func (s *Server) startMetricsServer() error {
 		// Next call blocks until the server is shut down
 		err := s.metricsSrv.ListenAndServe()
 		if err != http.ErrServerClosed {
-			s.log.Raw().Panic().Msgf("Error starting metrics server: %v", err)
+			s.log.Raw().Fatal().Msgf("Error starting metrics server: %v", err)
 		}
 	}()
 
@@ -366,24 +366,27 @@ func (s *Server) loadTLSConfig() (tlsConfig *tls.Config, watchFn tlsCertWatchFn,
 	}
 
 	// First, check if we have actual keys
-	tlsCert := viper.GetString(config.KeyTLSCert)
-	tlsKey := viper.GetString(config.KeyTLSKey)
+	tlsCert := viper.GetString(config.KeyTLSCertPEM)
+	tlsKey := viper.GetString(config.KeyTLSKeyPEM)
 
 	// If we don't have actual keys, then we need to load from file and reload when the files change
 	if tlsCert == "" && tlsKey == "" {
-		// Check if the TLS configuration is a single string, corresponding to a folder on disk
-		// Otherwise, use the folder where the config file is located
-		tlsVal := viper.GetString(config.KeyTLS)
-		if tlsVal == "" {
+		// If "tlsPath" is empty, use the folder where the config file is located
+		tlsPath := viper.GetString(config.KeyTLSPath)
+		if tlsPath == "" {
 			file := viper.ConfigFileUsed()
-			tlsVal = filepath.Dir(file)
+			tlsPath = filepath.Dir(file)
 		}
 
 		var provider *tlsCertProvider
-		provider, err = newTLSCertProvider(tlsVal)
+		provider, err = newTLSCertProvider(tlsPath)
 		if err != nil {
-			return nil, nil, fmt.Errorf("failed to load TLS certificates: %w", err)
+			return nil, nil, fmt.Errorf("failed to load TLS certificates from path '%s': %w", tlsPath, err)
 		}
+
+		s.log.Raw().Debug().
+			Str("path", tlsPath).
+			Msg("Loaded TLS certificates from disk")
 
 		tlsConfig.GetCertificate = provider.GetCertificateFn()
 
@@ -399,10 +402,12 @@ func (s *Server) loadTLSConfig() (tlsConfig *tls.Config, watchFn tlsCertWatchFn,
 	}
 
 	cert, err := tls.X509KeyPair([]byte(tlsCert), []byte(tlsKey))
-	if err == nil {
+	if err != nil {
 		return nil, nil, fmt.Errorf("failed to parse TLS certificate or key: %w", err)
 	}
 	tlsConfig.Certificates = []tls.Certificate{cert}
+
+	s.log.Raw().Debug().Msg("Loaded TLS certificates from PEM values")
 
 	return tlsConfig, nil, nil
 }

@@ -74,12 +74,17 @@ All configuration options:
 - **`bind`** (optional, default: `0.0.0.0`):  
   Address/interface to bind to.  
   Environmental variable name: `UNLOCKER_BIND`
-- **`tlsCert`** (optional, default: `tls-cert.pem` in the same folder as the `config.yaml` file):  
-  Path to a TLS certificate (PEM-encoded), or alternatively the entire PEM-encoded certificate as a string. Note that while this value is optional, a TLS certificate is **required** (even if self-signed).  
-  Environmental variable name: `UNLOCKER_TLSCERT`
-- **`tlsKey`** (optional, default: `tls-key.pem` in the same folder as the `config.yaml` file):  
-  Path to a TLS key (PEM-encoded), or alternatively the entire PEM-encoded key as a string. Note that while this value is optional, a TLS certificate is **required** (even if self-signed).  
-  Environmental variable name: `UNLOCKER_TLSKEY`
+- **`tlsPath`**: (optional, defaults to the same folder as the `config.yaml` file):  
+  Path where to load TLS certificates from. Within the folder, the files must be named `tls-cert.pem` and `tls-key.pem`. Unlocker watches for changes in this folder and automatically reloads the TLS certificates when they're updated.  
+  If empty, certificates are loaded from the same folder where the loaded `config.yaml` is located.  
+  Note that while this value is optional, a TLS certificate is **required** (even if self-signed).  
+  Environmental variable name: `UNLOCKER_TLSPATH`
+- **`tlsCertPEM`** (optional):  
+  Full, PEM-encoded TLS certificate. Using `tlsCertPEM` and `tlsKeyPEM` is an alternative method of passing TLS certificates than using `tlsPath`.  
+  Environmental variable name: `UNLOCKER_TLSCERTPEM`
+- **`tlsKeyPEM`** (optional):  
+  Full, PEM-encoded TLS key. Using `tlsCertPEM` and `tlsKeyPEM` is an alternative method of passing TLS certificates than using `tlsPath`.  
+  Environmental variable name: `UNLOCKER_TLSKEYPEM`
 - **`allowedIps`** (optional):  
   If set, allows connections to the APIs only from the IPs or ranges set here. You can set individual IP addresses (IPv4 or IPv6) or ranges in the CIDR notation, and you can add multiple values separated by commas. For example, to allow connections from localhost and IPs in the `10.x.x.x` range only, set this to: `127.0.0.1,10.0.0.0/8`.  
   Note that this value is used to restrict connections to the `/wrap`, `/unwrap`, and `/status` endpoints only. It does not restrict the endpoints used by administrators to confirm (or deny) requests.  

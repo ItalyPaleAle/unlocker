@@ -18,10 +18,12 @@ webhookUrl: ""
 webhookKey: ""
 
 # Configuration for TLS certificates and keys. It can be one of two options:
-# 1. A path to a folder on disk where the TLS certificate ("tls-cert.pem") and key ("tls-key.pem") exist.
-# 2. An object containing 2 keys: `cert`, `key`, which are the PEM-encoded certificate and key respectively.
-# If empty, it uses the folder where this config file is located to look for the certificate and key.
-tlsConfig: ""
+# 1. Use "tlsPath" to set a path to a folder on disk where the TLS certificate ("tls-cert.pem") and key ("tls-key.pem") exist.
+# 2. Alternatively, use both "tlsCertPEM" and "tlsKeyPEM", which are the PEM-encoded certificate and key respectively.
+# If neither "tlsPath" and the "tlsCertPEM"/"tlsKeyPEM" pair are provided, Unlocker uses the folder where this config file is located to look for the certificate and key in files named "tls-cert.pem" and "tls-key.pem" respectively.
+tlsPath: ""
+tlsCertPEM: ""
+tlsKeyPEM: ""
 
 # Port to listen on
 # Default: 8080
