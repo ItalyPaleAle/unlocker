@@ -11,7 +11,6 @@ import (
 	"io"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 
 	"github.com/lestrrat-go/jwx/v2/jwk"
@@ -137,18 +136,9 @@ func loadConfig() {
 			Msg("Invalid configuration")
 	}
 
-	// TLS certificate
-	// Fallback to tls-cert.pem and tls-key.pem if not set
-	if viper.GetString(config.KeyTLSCert) == "" || viper.GetString(config.KeyTLSKey) == "" {
-		file := viper.ConfigFileUsed()
-		dir := filepath.Dir(file)
-		viper.Set(config.KeyTLSCert, filepath.Join(dir, "tls-cert.pem"))
-		viper.Set(config.KeyTLSKey, filepath.Join(dir, "tls-key.pem"))
-	}
-
 	// Generate random tokenSigningKey if needed
 	if viper.GetString(config.KeyTokenSigningKey) == "" {
-		appLogger.Raw().Info().Msg("No 'tokenSigningKey' found in the configuration: a random one will be generated")
+		appLogger.Raw().Debug().Msg("No 'tokenSigningKey' found in the configuration: a random one will be generated")
 
 		tokenSigningKey, err := utils.RandomString()
 		if err != nil {
@@ -183,7 +173,7 @@ func setCookieKeys() {
 		cekRaw = sum[0:16]
 		cskRaw = sum[16:]
 	} else {
-		appLogger.Raw().Info().Msg("No 'cookieEncryptionKey' found in the configuration: a random one will be generated")
+		appLogger.Raw().Debug().Msg("No 'cookieEncryptionKey' found in the configuration: a random one will be generated")
 
 		cekRaw = make([]byte, 16)
 		_, err := io.ReadFull(rand.Reader, cekRaw)

@@ -3,8 +3,11 @@ package server
 import (
 	"context"
 	"crypto/tls"
+	"errors"
+	"fmt"
 	"net"
 	"net/http"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -31,13 +34,16 @@ type Server struct {
 	webhook    *utils.Webhook
 	metrics    metrics.UnlockerMetrics
 	// Subscribers that receive public events
-	pubsub     *utils.Broker[*requestStatePublic]
-	appSrv     *http.Server
-	metricsSrv *http.Server
+	pubsub *utils.Broker[*requestStatePublic]
 	// Subscriptions to watch for state changes
 	// Each state can only have one subscription
 	// If another call tries to subscribe to the same state, it will evict the first call
 	subs map[string]chan *requestState
+	// Servers
+	appSrv     *http.Server
+	metricsSrv *http.Server
+	// Method that forces a reload of TLS certificates from disk
+	tlsCertWatchFn tlsCertWatchFn
 }
 
 // Init the Server object and create a Gin server
@@ -145,26 +151,27 @@ func (s *Server) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	defer s.stopAppServer()
+	defer s.pubsub.Shutdown()
 
 	// Metrics server
 	if viper.GetBool(config.KeyEnableMetrics) {
 		err = s.startMetricsServer()
 		if err != nil {
-			_ = s.stopAppServer()
 			return err
 		}
+	}
+	defer s.stopMetricsServer()
+
+	// If we have a tlsCertWatchFn, invoke that
+	if s.tlsCertWatchFn != nil {
+		err = s.tlsCertWatchFn(ctx, s.log.Raw())
 	}
 
 	// Block until the context is canceled
 	<-ctx.Done()
 
-	// We received an interrupt signal, shut down the servers
-	s.pubsub.Shutdown()
-
-	// Ignore the returned errors
-	_ = s.stopAppServer()
-	_ = s.stopMetricsServer()
-
+	// Servers are stopped with deferred calls
 	return nil
 }
 
@@ -179,7 +186,7 @@ func (s *Server) startAppServer() error {
 	}
 
 	// Create the HTTPS server
-	tlsCert, err := s.loadTLSCert()
+	tlsConfig, tlsCertReloadFn, err := s.loadTLSConfig()
 	if err != nil {
 		return err
 	}
@@ -188,11 +195,9 @@ func (s *Server) startAppServer() error {
 		Handler:           s.appRouter,
 		MaxHeaderBytes:    1 << 20,
 		ReadHeaderTimeout: 10 * time.Second,
-		TLSConfig: &tls.Config{
-			MinVersion:   tls.VersionTLS12,
-			Certificates: tlsCert,
-		},
+		TLSConfig:         tlsConfig,
 	}
+	s.tlsCertWatchFn = tlsCertReloadFn
 
 	// Start the HTTPS server in a background goroutine
 	go func() {
@@ -251,6 +256,7 @@ func (s *Server) startMetricsServer() error {
 	// Start the HTTPS server in a background goroutine
 	go func() {
 		s.log.Raw().Info().
+			Str("bind", bindAddr).
 			Int("port", bindPort).
 			Msg("Metrics server started")
 		// Next call blocks until the server is shut down
@@ -353,23 +359,52 @@ func (s *Server) expireRequest(stateId string, validity time.Duration) {
 	s.metrics.RecordResult("expired")
 }
 
-// Loads the TLS certificate specified in the config file
-func (s *Server) loadTLSCert() ([]tls.Certificate, error) {
+// Loads the TLS configuration
+func (s *Server) loadTLSConfig() (tlsConfig *tls.Config, watchFn tlsCertWatchFn, err error) {
+	tlsConfig = &tls.Config{
+		MinVersion: minTLSVersion,
+	}
+
+	// First, check if we have actual keys
 	tlsCert := viper.GetString(config.KeyTLSCert)
 	tlsKey := viper.GetString(config.KeyTLSKey)
 
-	// Check if the values from the config file are PEM-encoded certificates directly
-	obj, err := tls.X509KeyPair([]byte(tlsCert), []byte(tlsKey))
-	if err == nil {
-		return []tls.Certificate{obj}, nil
+	// If we don't have actual keys, then we need to load from file and reload when the files change
+	if tlsCert == "" && tlsKey == "" {
+		// Check if the TLS configuration is a single string, corresponding to a folder on disk
+		// Otherwise, use the folder where the config file is located
+		tlsVal := viper.GetString(config.KeyTLS)
+		if tlsVal == "" {
+			file := viper.ConfigFileUsed()
+			tlsVal = filepath.Dir(file)
+		}
+
+		var provider *tlsCertProvider
+		provider, err = newTLSCertProvider(tlsVal)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to load TLS certificates: %w", err)
+		}
+
+		tlsConfig.GetCertificate = provider.GetCertificateFn()
+
+		return tlsConfig, provider.Watch, nil
 	}
 
-	// Try loading from file
-	obj, err = tls.LoadX509KeyPair(tlsCert, tlsKey)
-	if err != nil {
-		return nil, err
+	// Assume the values from the config file are PEM-encoded certs and key
+	if tlsCert == "" {
+		return nil, nil, errors.New("missing TLS certificate")
 	}
-	return []tls.Certificate{obj}, nil
+	if tlsKey == "" {
+		return nil, nil, errors.New("missing TLS key")
+	}
+
+	cert, err := tls.X509KeyPair([]byte(tlsCert), []byte(tlsKey))
+	if err == nil {
+		return nil, nil, fmt.Errorf("failed to parse TLS certificate or key: %w", err)
+	}
+	tlsConfig.Certificates = []tls.Certificate{cert}
+
+	return tlsConfig, nil, nil
 }
 
 type operationResponse struct {
