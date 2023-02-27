@@ -9,6 +9,7 @@ const (
 	KeyBind                   = "bind"
 	KeyCookieEncryptionKey    = "cookieEncryptionKey"
 	KeyEnableMetrics          = "enableMetrics"
+	KeyLogLevel               = "logLevel"
 	KeyMetricsBind            = "metricsBind"
 	KeyMetricsPort            = "metricsPort"
 	KeyOrigins                = "origins"

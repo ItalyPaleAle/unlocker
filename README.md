@@ -57,7 +57,7 @@ All configuration options:
   Endpoint of the webhook, where notifications are sent to.  
   Environmental variable name: `UNLOCKER_WEBHOOKURL`
 - **`webhookFormat`** (optional, default: `plain`):  
-  The format for the webhook. Currently these are supported:
+  The format for the webhook. Currently, these values are supported:
   - `plain` (default): sends a webhook with content type `text/plain`, where the request's body is the entire message.
   - `slack`: for usage with Slack or Slack-compatible endpoints
   - `discord`: for usage with Discord (sends Slack-compatible messages)  
@@ -117,6 +117,9 @@ All configuration options:
 
   If this option is empty, or if it contains the name of a header that is not found in an incoming request, a random UUID is generated as request ID.
   Environmental variable name: `UNLOCKER_TRUSTEDREQUESTIDHEADER`
+- **`logLevel`** (optional, default: `info`):  
+  Controls log level and verbosity. Supported values: `debug`, `info` (default), `warn`, `error`.
+  Environmental variable name: `UNLOCKER_LOGLEVEL`
 
 > To generate a self-signed TLS certificate, you can use:
 >

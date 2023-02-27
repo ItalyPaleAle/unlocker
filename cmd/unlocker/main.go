@@ -7,10 +7,10 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
-	"errors"
 	"io"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 
 	"github.com/lestrrat-go/jwx/v2/jwk"
@@ -26,7 +26,6 @@ var appLogger *utils.AppLogger
 
 func main() {
 	// Init the app logger object
-	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	appLogger = &utils.AppLogger{
 		App: "unlocker",
 	}
@@ -71,6 +70,7 @@ func main() {
 
 func loadConfig() {
 	// Defaults
+	viper.SetDefault(config.KeyLogLevel, "info")
 	viper.SetDefault(config.KeyPort, 8080)
 	viper.SetDefault(config.KeyBind, "0.0.0.0")
 	viper.SetDefault(config.KeyBaseUrl, "https://localhost:8080")
@@ -94,6 +94,7 @@ func loadConfig() {
 	}
 
 	// Read the config
+	// Note: don't print any log that's not fatal-level before loading the desired log level
 	err := viper.ReadInConfig()
 	if err != nil {
 		// Ignore errors if the config file doesn't exist
@@ -102,37 +103,53 @@ func loadConfig() {
 		}
 	}
 
+	// Log level
+	switch strings.ToLower(viper.GetString(config.KeyLogLevel)) {
+	case "debug":
+		appLogger.SetLogLevel(zerolog.DebugLevel)
+	case "", "info": // Also default log level
+		appLogger.SetLogLevel(zerolog.InfoLevel)
+	case "warn":
+		appLogger.SetLogLevel(zerolog.WarnLevel)
+	case "error":
+		appLogger.SetLogLevel(zerolog.ErrorLevel)
+	default:
+		appLogger.Raw().Fatal().
+			Str("error", "Invalid value for 'logLevel'").
+			Msg("Invalid configuration")
+	}
+
 	// Check required variables
 	if viper.GetString(config.KeyAzureClientId) == "" {
 		appLogger.Raw().Fatal().
-			AnErr("error", errors.New("Config entry key 'azureClientId' missing")).
+			Str("error", "Config entry key 'azureClientId' missing").
 			Msg("Invalid configuration")
 	}
 	if viper.GetString(config.KeyAzureClientSecret) == "" {
 		appLogger.Raw().Fatal().
-			AnErr("error", errors.New("Config entry key 'azureClientSecret' missing")).
+			Str("error", "Config entry key 'azureClientSecret' missing").
 			Msg("Invalid configuration")
 	}
 	if viper.GetString(config.KeyAzureTenantId) == "" {
 		appLogger.Raw().Fatal().
-			AnErr("error", errors.New("Config entry key 'azureTenantId' missing")).
+			Str("error", "Config entry key 'azureTenantId' missing").
 			Msg("Invalid configuration")
 	}
 	if viper.GetString(config.KeyWebhookUrl) == "" {
 		appLogger.Raw().Fatal().
-			AnErr("error", errors.New("Config entry key 'webhookUrl' missing")).
+			Str("error", "Config entry key 'webhookUrl' missing").
 			Msg("Invalid configuration")
 	}
 
 	// Check for invalid values
 	if v := viper.GetInt(config.KeySessionTimeout); v < 1 || v > 3600 {
 		appLogger.Raw().Fatal().
-			AnErr("error", errors.New("Config entry key 'sessionTimeout' is invalid: must be between 1 and 3600")).
+			Str("error", "Config entry key 'sessionTimeout' is invalid: must be between 1 and 3600").
 			Msg("Invalid configuration")
 	}
 	if v := viper.GetInt(config.KeyRequestTimeout); v < 1 {
 		appLogger.Raw().Fatal().
-			AnErr("error", errors.New("Config entry key 'requestTimeout' is invalid: must be greater than 1")).
+			Str("error", "Config entry key 'requestTimeout' is invalid: must be greater than 1").
 			Msg("Invalid configuration")
 	}
 

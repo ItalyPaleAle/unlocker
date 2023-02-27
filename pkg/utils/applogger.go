@@ -14,7 +14,7 @@ type AppLogger struct {
 	// Optional "app" field to add
 	App string
 
-	log *zerolog.Logger
+	log zerolog.Logger
 }
 
 // Init the object with the default writer for gin
@@ -28,9 +28,13 @@ func (a *AppLogger) InitWithWriter(out io.Writer) error {
 	if a.App != "" {
 		lctx = lctx.Str("app", a.App)
 	}
-	logger := lctx.Logger()
-	a.log = &logger
+	a.log = lctx.Logger()
 	return nil
+}
+
+// SetLogLevel updates the logger to set
+func (a *AppLogger) SetLogLevel(level zerolog.Level) {
+	a.log = a.log.Level(level)
 }
 
 // Log returns a zerolog.Logger with data to append for custom logging
@@ -46,7 +50,7 @@ func (a *AppLogger) Log(c *gin.Context) *zerolog.Logger {
 
 // Raw returns the raw zerolog.Logger instances
 func (a *AppLogger) Raw() *zerolog.Logger {
-	return a.log
+	return &a.log
 }
 
 // LoggerMiddleware is a Gin middleware that uses zerlog for logging

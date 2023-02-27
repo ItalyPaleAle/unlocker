@@ -82,3 +82,7 @@ cookieEncryptionKey: ""
 # - "CF-Ray": when the application is served by a Cloudflare CDN: https://developers.cloudflare.com/fundamentals/get-started/reference/cloudflare-ray-id/
 # If this option is empty, or if it contains the name of a header that is not found in an incoming request, a random UUID is generated as request ID.
 trustedRequestIdHeader: ""
+
+# Log level.
+# Supported values: "debug", "info" (default), "warn", "error"
+logLevel: "info"
