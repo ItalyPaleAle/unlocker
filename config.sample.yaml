@@ -69,11 +69,11 @@ metricsPort: 2112
 metricsBind: "0.0.0.0"
 
 # String used as key to sign state tokens
-# If left empty, it will be randomly generated every time the app starts (not recommended if you are scaling Unlocker horizontally or if you want user sessions to persist after the application is restarted).
+# If left empty, it will be randomly generated every time the app starts (recommended, unless you need user sessions to persist after the application is restarted).
 tokenSigningKey: ""
 
 # String used as key to encrypt cookies
-# If left empty, it will be randomly generated every time the app starts (not recommended if you are scaling Unlocker horizontally or if you want user sessions to persist after the application is restarted).
+# If left empty, it will be randomly generated every time the app starts (recommended, unless you need user sessions to persist after the application is restarted).
 cookieEncryptionKey: ""
 
 # String with the name of a header to trust as ID of each request. The ID is included in logs and in responses as "X-Request-ID" header.

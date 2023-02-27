@@ -103,10 +103,10 @@ All configuration options:
   Address/interface for the metrics server to bind to.  
   Environmental variable name: `UNLOCKER_METRICSBIND`
 - **`tokenSigningKey`** (optional, will be randomly generated at startup if empty):  
-  String used as key to sign state tokens. If left empty, it will be randomly generated every time the app starts (not recommended if you are scaling Unlocker horizontally or if you want user sessions to persist after the application is restarted).  
+  String used as key to sign state tokens. If left empty, it will be randomly generated every time the app starts (recommended, unless you need user sessions to persist after the application is restarted).  
   Environmental variable name: `UNLOCKER_TOKENSIGNINGKEY`
 - **`cookieEncryptionKey`** (optional, will be randomly generated at startup if empty):  
-  String used as key to encrypt cookies. If left empty, it will be randomly generated every time the app starts (not recommended if you are scaling Unlocker horizontally or if you want user sessions to persist after the application is restarted).  
+  String used as key to encrypt cookies. If left empty, it will be randomly generated every time the app starts (recommended, unless you need user sessions to persist after the application is restarted).  
   Environmental variable name: `UNLOCKER_COOKIEENCRYPTIONKEY`
 - **`trustedRequestIdHeader`** (optional):  
   String with the name of a header to trust as ID of each request. The ID is included in logs and in responses as `X-Request-ID` header.  
