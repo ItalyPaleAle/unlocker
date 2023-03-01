@@ -1,4 +1,4 @@
-# Unlocker v0.3
+# Unlocker v0.4
 
 Unlocker lets you wrap and unwrap (encrypt and decrypt) cryptographic keys for use by applications, securely after getting consent from an admin.
 
@@ -145,10 +145,10 @@ docker run \
   -d \
   -p 8080:8080 \
   -v $HOME/.unlocker:/etc/unlocker \
-  ghcr.io/italypaleale/unlocker:0.3
+  ghcr.io/italypaleale/unlocker:0.4
 ```
 
-> Unlocker follows semver for versioning. The command above uses the latest version in the 0.3 branch. We do not publish a container image tagged "latest".
+> Unlocker follows semver for versioning. The command above uses the latest version in the 0.4 branch. We do not publish a container image tagged "latest".
 
 ### Start as standalone app
 
