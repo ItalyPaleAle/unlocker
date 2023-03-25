@@ -15,7 +15,6 @@ type Broker[T any] struct {
 // NewBroker returns a new Broker object
 func NewBroker[T any]() *Broker[T] {
 	return &Broker[T]{
-		lock:        sync.RWMutex{},
 		subscribers: map[chan T]struct{}{},
 		active:      true,
 	}

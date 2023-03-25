@@ -52,15 +52,15 @@ func (s *Server) routeApiListGetSingle(c *gin.Context) {
 func (s *Server) routeApiListGetStream(c *gin.Context) {
 	// Timeout for the user's session
 	var timeout *time.Timer
-	ttlAny, ok := c.Get(contextKeySessionTTL)
+	expirationAny, ok := c.Get(contextKeySessionExpiration)
 	if ok {
-		ttl, ok := ttlAny.(time.Duration)
+		expiration, ok := expirationAny.(time.Time)
 		if ok {
-			timeout = time.NewTimer(ttl)
+			timeout = time.NewTimer(time.Until(expiration))
 		}
 	}
 	if timeout == nil {
-		_ = c.Error(errors.New("request did not contain a valid session TTL in context"))
+		_ = c.Error(errors.New("request did not contain a valid session expiration in the context"))
 		c.AbortWithStatusJSON(http.StatusInternalServerError, InternalServerError)
 		return
 	}

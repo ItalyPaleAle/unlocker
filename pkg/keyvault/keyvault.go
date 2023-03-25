@@ -1,201 +1,120 @@
 package keyvault
 
 import (
-	"bytes"
 	"context"
-	"encoding/base64"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"net/http"
+	"strings"
 	"time"
+
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
+	"github.com/Azure/azure-sdk-for-go/sdk/keyvault/azkeys"
 )
 
 // Client is a client for Azure Key Vault
 type Client struct {
-	accessToken string
-	httpClient  *http.Client
+	cred tokenProvider
 }
 
 // Init the object
-func (c *Client) Init(accessToken string) error {
-	c.accessToken = accessToken
-
-	// Init a HTTP client
-	c.httpClient = &http.Client{
-		Timeout: 20 * time.Second,
-	}
-
+func (c *Client) Init(accessToken string, expiration time.Time) error {
+	c.cred = newTokenProvider(accessToken, expiration)
 	return nil
 }
 
-// KeyUrl returns the URL for a key in Azure Key Vault
-func (c *Client) KeyUrl(vault, keyId, keyVersion string) string {
-	if keyVersion == "" {
-		return fmt.Sprintf("https://%s.vault.azure.net/keys/%s", vault, keyId)
+// vaultUrl returns the URL for the Azure Key Vault
+// Parameter vault can be one of:
+// - The address of the vault, such as "https://<name>.vault.azure.net" (could be a different format if using different clouds or private endpoints)
+// - The FQDN of the vault, such as "<name>.vault.azure.net" (or another domain if using different clouds or private endpoints)
+// - Only the name of the vault, which will be formatted for "vault.azure.net"
+func (c Client) vaultUrl(vault string) string {
+	// If there's a dot, assume it's either a full URL or a FQDN
+	if strings.ContainsRune(vault, '.') {
+		if !strings.HasPrefix(vault, "https://") {
+			vault = "https://" + vault
+		}
+		return vault
 	}
-	return fmt.Sprintf("https://%s.vault.azure.net/keys/%s/%s", vault, keyId, keyVersion)
+
+	return "https://" + vault + ".vault.azure.net"
 }
 
-// GetKeyLastVersion returns the latest version of a key stored in Key Vault
-func (c *Client) GetKeyLastVersion(ctx context.Context, vault string, keyId string) (string, error) {
-	reqUrl := fmt.Sprintf("https://%s.vault.azure.net/keys/%s", vault, keyId)
-	req, err := http.NewRequestWithContext(ctx, "GET", reqUrl+"?api-version=7.2", nil)
-	if err != nil {
-		return "", err
-	}
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.accessToken)
+// getClient returns the azkeys.Client object for the given vault
+func (c *Client) getClient(vault string) (*azkeys.Client, error) {
+	vaultUrl := c.vaultUrl(vault)
 
-	// Send the request and read the result
-	res, err := c.httpClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer res.Body.Close()
-	resBody, err := io.ReadAll(res.Body)
-	if err != nil {
-		return "", err
-	}
-	if res.StatusCode != 200 {
-		resError := &KeyVaultError{}
-		if json.Unmarshal(resBody, resError) != nil {
-			// Body cannot be unmarshalled into keyVaultError
-			return "", errors.New("response error: " + string(resBody))
-		}
-		return "", errors.New(resError.String())
-	}
-	resData := &struct {
-		Key struct {
-			Kid string `json:"kid"`
-		} `json:"key"`
-	}{}
-	err = json.Unmarshal(resBody, resData)
-	if err != nil {
-		return "", err
-	}
-	if resData.Key.Kid == "" {
-		return "", errors.New("empty key id in response")
-	}
-
-	// Extract the version at the end of the URL
-	return resData.Key.Kid[len(reqUrl)+1:], nil
+	return azkeys.NewClient(vaultUrl, c.cred, &azkeys.ClientOptions{
+		ClientOptions: policy.ClientOptions{
+			Telemetry: policy.TelemetryOptions{
+				Disabled: true,
+			},
+		},
+	})
 }
 
 // WrapKey wraps a key using the key-encryption-key stored in the Key Vault at keyUrl
-func (c *Client) WrapKey(ctx context.Context, keyUrl string, key []byte) ([]byte, error) {
-	if keyUrl == "" {
-		return nil, errors.New("argument keyUrl is empty")
+func (c *Client) WrapKey(ctx context.Context, vault, keyName, keyVersion string, key []byte) ([]byte, error) {
+	if vault == "" {
+		return nil, errors.New("argument vault is empty")
+	}
+	if keyName == "" {
+		return nil, errors.New("argument keyName is empty")
 	}
 	if len(key) == 0 {
 		return nil, errors.New("argument key is empty")
 	}
 
-	// Send the request
-	return c.doWrapUnwrap(ctx, keyUrl+"/wrapkey", key)
+	// Get the client
+	client, err := c.getClient(vault)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get Azure Key Vault client: %w", err)
+	}
+
+	// Perform the operation
+	res, err := client.WrapKey(ctx, keyName, keyVersion, azkeys.KeyOperationsParameters{
+		Value:     key,
+		Algorithm: to.Ptr(azkeys.JSONWebKeyEncryptionAlgorithmRSAOAEP256),
+	}, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error from Azure Key Vault: %w", err)
+	}
+	if res.Result == nil {
+		return nil, errors.New("response from Azure Key Vault is empty")
+	}
+
+	return res.Result, nil
 }
 
 // UnwrapKey unwrap a wrapped key using the key-encryption-key stored in the Key Vault at keyUrl
-func (c *Client) UnwrapKey(ctx context.Context, keyUrl string, wrappedKey []byte) ([]byte, error) {
-	if keyUrl == "" {
-		return nil, errors.New("argument keyUrl is empty")
+func (c *Client) UnwrapKey(ctx context.Context, vault, keyName, keyVersion string, wrappedKey []byte) ([]byte, error) {
+	if vault == "" {
+		return nil, errors.New("argument vault is empty")
+	}
+	if keyName == "" {
+		return nil, errors.New("argument keyName is empty")
 	}
 	if len(wrappedKey) == 0 {
 		return nil, errors.New("argument wrappedKey is empty")
 	}
 
-	// Send the request
-	return c.doWrapUnwrap(ctx, keyUrl+"/unwrapkey", wrappedKey)
-}
-
-// Internal function that performs wrap and unwrap operations on the keys
-func (c *Client) doWrapUnwrap(ctx context.Context, reqUrl string, key []byte) ([]byte, error) {
-	// Request body
-	// We need to encode the value ourselves using base64 URL-encoding
-	reqBodyData := struct {
-		Algorithm string `json:"alg"`
-		Value     string `json:"value"`
-	}{
-		Algorithm: "RSA-OAEP-256",
-		Value:     base64.RawURLEncoding.EncodeToString(key),
-	}
-	reqBody, err := json.Marshal(reqBodyData)
+	// Get the client
+	client, err := c.getClient(vault)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get Azure Key Vault client: %w", err)
 	}
 
-	// Build the request
-	req, err := http.NewRequestWithContext(ctx, "POST", reqUrl+"?api-version=7.2", bytes.NewReader(reqBody))
+	// Perform the operation
+	res, err := client.UnwrapKey(ctx, keyName, keyVersion, azkeys.KeyOperationsParameters{
+		Value:     wrappedKey,
+		Algorithm: to.Ptr(azkeys.JSONWebKeyEncryptionAlgorithmRSAOAEP256),
+	}, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error from Azure Key Vault: %w", err)
 	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", "Bearer "+c.accessToken)
-
-	// Send the request and read the result
-	res, err := c.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer res.Body.Close()
-	resBody, err := io.ReadAll(res.Body)
-	if err != nil {
-		return nil, err
-	}
-	if res.StatusCode != 200 {
-		kvErr := &KeyVaultError{}
-		if json.Unmarshal(resBody, kvErr) != nil || kvErr.Err.Code == "" {
-			// Body cannot be unmarshalled into keyVaultError
-			return nil, errors.New("response error: " + string(resBody))
-		}
-		return nil, kvErr
-	}
-	resData := &keyOperationResult{}
-	err = json.Unmarshal(resBody, resData)
-	if err != nil {
-		return nil, err
-	}
-	if resData.Value == "" {
-		return nil, errors.New("empty value in response")
+	if res.Result == nil {
+		return nil, errors.New("response from Azure Key Vault is empty")
 	}
 
-	// Decode the value from the response
-	// We need to do it ourselves because Key Vault uses base64 URL-encoding
-	val, err := base64.RawURLEncoding.DecodeString(resData.Value)
-	if err != nil {
-		return nil, err
-	}
-	return val, nil
-}
-
-// Type of responses containing a key (wrapped or unwrapped)
-// Value is used as string because Key Vault uses base64 URL encoding
-type keyOperationResult struct {
-	KeyId string `json:"kid"`
-	Value string `json:"value"`
-}
-
-// Type of error responses
-type KeyVaultError struct {
-	Err struct {
-		Message    string         `json:"message"`
-		Code       string         `json:"code"`
-		InnerError *KeyVaultError `json:"innererror"`
-	} `json:"error"`
-}
-
-// String representation
-func (e *KeyVaultError) String() string {
-	var details string
-	if e.Err.InnerError != nil {
-		details = fmt.Sprintf("\ndetails='%v'", e.Err.InnerError)
-	}
-	return fmt.Sprintf("error from Key Vault (code='%s') error='%s'%s", e.Err.Code, e.Err.Message, details)
-}
-
-// Error implements the error interface
-func (e *KeyVaultError) Error() string {
-	return e.String()
+	return res.Result, nil
 }

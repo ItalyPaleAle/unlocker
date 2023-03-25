@@ -117,9 +117,14 @@ func (s *Server) RouteAuthConfirm(c *gin.Context) {
 		return
 	}
 
+	// Expiration is the minimum of the session timeout set in the config, and the token's expiration
+	expiration := viper.GetInt(config.KeySessionTimeout)
+	if accessToken.ExpiresIn > 0 && expiration > accessToken.ExpiresIn {
+		expiration = accessToken.ExpiresIn
+	}
+
 	// Set the access token in a cookie
-	maxAge := viper.GetInt(config.KeySessionTimeout)
-	err = setSecureCookie(c, atCookieName, accessToken.AccessToken, maxAge, "/", c.Request.URL.Host, secureCookie, true)
+	err = setSecureCookie(c, atCookieName, accessToken.AccessToken, expiration, "/", c.Request.URL.Host, secureCookie, true)
 	if err != nil {
 		_ = c.Error(err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, InternalServerError)

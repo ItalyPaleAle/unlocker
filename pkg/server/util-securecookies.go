@@ -77,7 +77,10 @@ func getSecureCookie(c *gin.Context, name string) (plaintextValue string, ttl ti
 	return v, ttl, nil
 }
 
-func setSecureCookie(c *gin.Context, name string, plaintextValue string, maxAge int, path string, domain string, secureCookie bool, httpOnly bool) error {
+func setSecureCookie(c *gin.Context, name string, plaintextValue string, expiration int, path string, domain string, secureCookie bool, httpOnly bool) error {
+	if expiration < 1 {
+		return errors.New("invalid expiration value: must be greater than 0")
+	}
 	cek, ok := viper.Get(config.KeyInternalCookieEncryptionKey).(jwk.Key)
 	if !ok || cek == nil {
 		return errors.New("empty or invalid cookieEncryptionKey in the configuration")
@@ -97,7 +100,7 @@ func setSecureCookie(c *gin.Context, name string, plaintextValue string, maxAge 
 		}).
 		IssuedAt(now).
 		// Add 1 extra second to synchronize with cookie expiry
-		Expiration(now.Add(time.Duration(maxAge+1)*time.Second)).
+		Expiration(now.Add(time.Duration(expiration+1)*time.Second)).
 		NotBefore(now).
 		Claim("v", plaintextValue).
 		Build()
@@ -118,7 +121,7 @@ func setSecureCookie(c *gin.Context, name string, plaintextValue string, maxAge 
 	}
 
 	// Set the cookie
-	c.SetCookie(name, string(cookieValue), maxAge, "/", c.Request.URL.Host, secureCookie, true)
+	c.SetCookie(name, string(cookieValue), expiration, "/", c.Request.URL.Host, secureCookie, true)
 
 	return nil
 }

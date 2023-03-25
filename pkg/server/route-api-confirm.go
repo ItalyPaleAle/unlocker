@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/gin-gonic/gin"
 
 	"github.com/italypaleale/unlocker/pkg/keyvault"
@@ -90,7 +91,10 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestSta
 	}()
 
 	// Errors here should never happen
-	var at string
+	var (
+		at         string
+		expiration time.Time
+	)
 	atAny, ok := c.Get(contextKeySessionAccessToken)
 	if ok {
 		at, ok = atAny.(string)
@@ -98,12 +102,19 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestSta
 			at = ""
 		}
 	}
+	expirationAny, ok := c.Get(contextKeySessionExpiration)
+	if ok {
+		expiration, ok = expirationAny.(time.Time)
+		if !ok {
+			expiration = time.Time{}
+		}
+	}
 
 	start := time.Now()
 
 	// Init the Key Vault client
 	akv := keyvault.Client{}
-	err := akv.Init(at)
+	err := akv.Init(at, expiration)
 	if err != nil {
 		_ = c.Error(err)
 		c.AbortWithStatusJSON(http.StatusInternalServerError, InternalServerError)
@@ -112,18 +123,18 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestSta
 
 	// Make the request
 	var output []byte
-	keyUrl := akv.KeyUrl(state.Vault, state.KeyId, state.KeyVersion)
 	if state.Operation == OperationWrap {
-		output, err = akv.WrapKey(c.Request.Context(), keyUrl, state.Input)
+		output, err = akv.WrapKey(c.Request.Context(), state.Vault, state.KeyId, state.KeyVersion, state.Input)
 	} else if state.Operation == OperationUnwrap {
-		output, err = akv.UnwrapKey(c.Request.Context(), keyUrl, state.Input)
+		output, err = akv.UnwrapKey(c.Request.Context(), state.Vault, state.KeyId, state.KeyVersion, state.Input)
 	}
 	if err != nil {
 		_ = c.Error(err)
-		if kvErr, ok := err.(*keyvault.KeyVaultError); ok {
+		var azErr *azcore.ResponseError
+		if errors.As(err, &azErr) {
 			// If the error comes from Key Vault, we need to cancel the request
 			s.cancelRequest(stateId, state)
-			errStr := fmt.Sprintf("Azure Key Vault returned an error: %s (%s)", kvErr.Err.Message, kvErr.Err.Code)
+			errStr := fmt.Sprintf("Azure Key Vault returned an error: %s (%s)", azErr.ErrorCode, azErr.RawResponse.Status)
 			c.AbortWithStatusJSON(http.StatusConflict, ErrorResponse(errStr))
 			return
 		}
