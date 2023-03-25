@@ -125,11 +125,6 @@ func loadConfig() {
 			Str("error", "Config entry key 'azureClientId' missing").
 			Msg("Invalid configuration")
 	}
-	if viper.GetString(config.KeyAzureClientSecret) == "" {
-		appLogger.Raw().Fatal().
-			Str("error", "Config entry key 'azureClientSecret' missing").
-			Msg("Invalid configuration")
-	}
 	if viper.GetString(config.KeyAzureTenantId) == "" {
 		appLogger.Raw().Fatal().
 			Str("error", "Config entry key 'azureTenantId' missing").

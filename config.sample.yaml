@@ -1,7 +1,5 @@
 # Configuration for the Azure AD application used to authenticate (see setup instructions in README)
-# (Required)
 azureClientId: ""
-azureClientSecret: ""
 azureTenantId: ""
 
 # Format for the webhook request

@@ -47,9 +47,6 @@ All configuration options:
 - **`azureClientId`** (**required**):  
   Client ID of the Azure AD application (see the [Azure AD application](#azure-ad-application) step in the [Set up](#set-up) section below).  
   Environmental variable name: `UNLOCKER_AZURECLIENTID`
-- **`azureClientSecret`** (**required**):  
-  Client secret of the Azure AD application.  
-  Environmental variable name: `UNLOCKER_AZURECLIENTSECRET`
 - **`azureTenantId`** (**required**):  
   Tenant ID of the Azure AD application.  
   Environmental variable name: `UNLOCKER_AZURETENANTID`
@@ -468,30 +465,22 @@ APP_ID=$(az ad app create \
   --available-to-other-tenants false \
   --oauth2-allow-implicit-flow false \
   | jq -r .appId)
-APP_OBJECT_ID=$(az ad app show --id $APP_ID | jq -r .objectId)
+APP_OBJECT_ID=$(az ad app show --id $APP_ID | jq -r .id)
 az rest \
   --method PATCH \
   --uri "https://graph.microsoft.com/v1.0/applications/${APP_OBJECT_ID}" \
-  --body "{\"web\":{\"redirectUris\":[\"${APP_URL}/auth/confirm\"]}}"
+  --body "{\"spa\":{\"redirectUris\":[\"${APP_URL}/auth/confirm\"]}}"
 
 # Grant permissions for Azure Key Vault
 az ad app permission add \
   --id $APP_ID \
   --api cfa8b339-82a2-471a-a3c9-0fc0be7a4093 \
   --api-permissions f53da476-18e3-4152-8e01-aec403e6edc0=Scope
-
-# Add the client secret
-az ad app credential reset \
-  --id $APP_ID \
-  --credential-description cli \
-  --years 10 \
-  --password $(openssl rand -base64 30)
 ```
 
 Take note of the output of the last command, which includes the values for the `config.yaml` file:
 
 - `appId` is the value for `azureClientId`
-- `password` is the value for `azureClientSecret`
 - `tenant` is the value for `azureTenantId`
 
 > Note that the Azure AD application does not need permissions on the Key Vault. Instead, Unlocker uses delegated permissions, matching whatever access level the authenticated user has.

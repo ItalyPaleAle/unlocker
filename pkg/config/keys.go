@@ -3,7 +3,6 @@ package config
 const (
 	KeyAllowedIps             = "allowedIps"
 	KeyAzureClientId          = "azureClientId"
-	KeyAzureClientSecret      = "azureClientSecret"
 	KeyAzureTenantId          = "azureTenantId"
 	KeyBaseUrl                = "baseUrl"
 	KeyBind                   = "bind"

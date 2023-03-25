@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -21,10 +22,10 @@ import (
 )
 
 const (
-	// Name of the CSRF cookie
-	csrfCookieName = "_csrf_state"
-	// Max Age for the CSRF cookie
-	csrfCookieMaxAge = 5 * time.Minute
+	// Name of the auth state cookie
+	authStateCookieName = "_auth_state"
+	// Max Age for the auth state cookie
+	authStateCookieMaxAge = 5 * time.Minute
 	// Name of the Access Token cookie
 	atCookieName = "_at"
 )
@@ -52,20 +53,32 @@ func (s *Server) RouteAuth(c *gin.Context) {
 		return
 	}
 
-	// Set the seed as cookie
+	// Set the auth state as a secure cookie
 	secureCookie := c.Request.URL.Scheme == "https:"
-	c.SetCookie(csrfCookieName, seed, int(csrfCookieMaxAge.Seconds()), "/", c.Request.URL.Host, secureCookie, true)
+	err = setSecureCookie(c, authStateCookieName, seed, int(authStateCookieMaxAge.Seconds()), "/", c.Request.URL.Host, secureCookie, true)
+	if err != nil {
+		_ = c.Error(fmt.Errorf("failed to set access token secure cookie: %w", err))
+		c.AbortWithStatusJSON(http.StatusInternalServerError, InternalServerError)
+		return
+	}
+
+	// Use the seed also as code verifier for the PKCE challenge
+	// Compute the SHA-256 hash of that as code_challenge
+	// See: https://datatracker.ietf.org/doc/html/rfc7636
+	codeChallenge := sha256.Sum256([]byte(seed))
 
 	// Build the redirect URL
 	tenantId := viper.GetString(config.KeyAzureTenantId)
 	qs := url.Values{
-		"response_type": []string{"code"},
-		"client_id":     []string{viper.GetString(config.KeyAzureClientId)},
-		"redirect_uri":  []string{viper.GetString(config.KeyBaseUrl) + "/auth/confirm"},
-		"response_mode": []string{"query"},
-		"state":         []string{stateToken},
-		"scope":         []string{"https://vault.azure.net/user_impersonation"},
-		"domain_hint":   []string{tenantId},
+		"response_type":         []string{"code"},
+		"client_id":             []string{viper.GetString(config.KeyAzureClientId)},
+		"redirect_uri":          []string{viper.GetString(config.KeyBaseUrl) + "/auth/confirm"},
+		"response_mode":         []string{"query"},
+		"state":                 []string{stateToken},
+		"scope":                 []string{"https://vault.azure.net/user_impersonation"},
+		"domain_hint":           []string{tenantId},
+		"code_challenge_method": []string{"S256"},
+		"code_challenge":        []string{base64.RawURLEncoding.EncodeToString(codeChallenge[:])},
 	}
 
 	// Redirect
@@ -90,29 +103,32 @@ func (s *Server) RouteAuthConfirm(c *gin.Context) {
 		return
 	}
 
-	// Ensure that the user has the CSRF cookie
-	seed, _ := c.Cookie(csrfCookieName)
-	if seed == "" {
-		_ = c.Error(errors.New("CSRF cookie is missing or invalid"))
-		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("CSRF cookie is missing or invalid"))
+	// Ensure that the user has the auth state cookie
+	seed, _, err := getSecureCookie(c, authStateCookieName)
+	if err == nil && seed == "" {
+		err = errors.New("auth state cookie is missing")
+	}
+	if err != nil {
+		_ = c.Error(fmt.Errorf("failed to retrieve auth state cookie: %w", err))
+		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("auth state cookie is missing or invalid"))
 		return
 	}
 
-	// Unset the CSRF cookie
+	// Unset the auth state cookie
 	secureCookie := c.Request.URL.Scheme == "https:"
-	c.SetCookie(csrfCookieName, "", -1, "/", c.Request.URL.Host, secureCookie, true)
+	c.SetCookie(authStateCookieName, "", -1, "/", c.Request.URL.Host, secureCookie, true)
 
 	// Validate the state token
 	if !validateStateToken(c, stateToken, seed) {
-		_ = c.Error(errors.New("State token could not be validated"))
+		_ = c.Error(errors.New("state token could not be validated"))
 		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("The state token could not be validated"))
 		return
 	}
 
 	// Exchange the code for an access token
-	accessToken, err := s.requestAccessToken(c.Request.Context(), code)
+	accessToken, err := s.requestAccessToken(c.Request.Context(), code, seed)
 	if err != nil {
-		_ = c.Error(err)
+		_ = c.Error(fmt.Errorf("failed to obtain access token: %w", err))
 		c.AbortWithStatusJSON(http.StatusInternalServerError, ErrorResponse("Error obtaining access token"))
 		return
 	}
@@ -126,7 +142,7 @@ func (s *Server) RouteAuthConfirm(c *gin.Context) {
 	// Set the access token in a cookie
 	err = setSecureCookie(c, atCookieName, accessToken.AccessToken, expiration, "/", c.Request.URL.Host, secureCookie, true)
 	if err != nil {
-		_ = c.Error(err)
+		_ = c.Error(fmt.Errorf("failed to set access token secure cookie: %w", err))
 		c.AbortWithStatusJSON(http.StatusInternalServerError, InternalServerError)
 		return
 	}
@@ -135,15 +151,15 @@ func (s *Server) RouteAuthConfirm(c *gin.Context) {
 	c.Redirect(http.StatusTemporaryRedirect, viper.GetString(config.KeyBaseUrl))
 }
 
-func (s *Server) requestAccessToken(ctx context.Context, code string) (*AccessToken, error) {
+func (s *Server) requestAccessToken(ctx context.Context, code, seed string) (*AccessToken, error) {
 	// Build the request
 	data := url.Values{
 		"code":          []string{code},
 		"client_id":     []string{viper.GetString(config.KeyAzureClientId)},
-		"client_secret": []string{viper.GetString(config.KeyAzureClientSecret)},
 		"redirect_uri":  []string{viper.GetString(config.KeyBaseUrl) + "/auth/confirm"},
 		"scope":         []string{"https://vault.azure.net/user_impersonation"},
 		"grant_type":    []string{"authorization_code"},
+		"code_verifier": []string{seed}, // For PKCE
 	}
 	body := strings.NewReader(data.Encode())
 
