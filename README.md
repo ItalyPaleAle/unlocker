@@ -469,7 +469,7 @@ APP_OBJECT_ID=$(az ad app show --id $APP_ID | jq -r .id)
 az rest \
   --method PATCH \
   --uri "https://graph.microsoft.com/v1.0/applications/${APP_OBJECT_ID}" \
-  --body "{\"spa\":{\"redirectUris\":[\"${APP_URL}/auth/confirm\"]}}"
+  --body "{\"publicClient\":{\"redirectUris\":[\"${APP_URL}/auth/confirm\"]}}"
 
 # Grant permissions for Azure Key Vault
 az ad app permission add \
