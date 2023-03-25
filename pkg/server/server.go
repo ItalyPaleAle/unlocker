@@ -151,6 +151,7 @@ func (s *Server) Start(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	//nolint:errcheck
 	defer s.stopAppServer()
 	defer s.pubsub.Shutdown()
 
@@ -161,11 +162,15 @@ func (s *Server) Start(ctx context.Context) error {
 			return err
 		}
 	}
+	//nolint:errcheck
 	defer s.stopMetricsServer()
 
 	// If we have a tlsCertWatchFn, invoke that
 	if s.tlsCertWatchFn != nil {
 		err = s.tlsCertWatchFn(ctx, s.log.Raw())
+		if err != nil {
+			return fmt.Errorf("failed to watch for TLS certificates: %w", err)
+		}
 	}
 
 	// Block until the context is canceled
