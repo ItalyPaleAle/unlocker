@@ -45,15 +45,29 @@ type AccessToken struct {
 // RouteAuth is the handler for the GET /auth request
 // This redirects the user to the page where they can sign in
 func (s *Server) RouteAuth(c *gin.Context) {
+	// Check if we already have a state cookie that was issued recently
+	// It can happen that clients are redirected to the auth page more than once at the same time
+	seed, ttl, err := getSecureCookie(c, authStateCookieName)
+	if err != nil || seed == "" || ttl < (authStateCookieMaxAge-time.Minute) {
+		// Generate a random seed
+		seed, err = utils.RandomString()
+		if err != nil {
+			_ = c.Error(fmt.Errorf("failed to generate random seed: %w", err))
+			c.JSON(http.StatusInternalServerError, InternalServerError)
+			return
+		}
+	}
+
 	// Build the state object
-	stateToken, seed, err := createStateToken(c)
+	stateToken, err := createStateToken(c, seed)
 	if err != nil {
-		_ = c.Error(err)
+		_ = c.Error(fmt.Errorf("failed to create state token: %w", err))
 		c.JSON(http.StatusInternalServerError, InternalServerError)
 		return
 	}
 
 	// Set the auth state as a secure cookie
+	// This may reset the existing cookie
 	secureCookie := c.Request.URL.Scheme == "https:"
 	err = setSecureCookie(c, authStateCookieName, seed, int(authStateCookieMaxAge.Seconds()), "/", c.Request.URL.Host, secureCookie, true)
 	if err != nil {
@@ -197,17 +211,11 @@ func (s *Server) requestAccessToken(ctx context.Context, code, seed string) (*Ac
 	return token, nil
 }
 
-func createStateToken(c *gin.Context) (stateToken string, seed string, err error) {
+func createStateToken(c *gin.Context, seed string) (stateToken string, err error) {
 	tokenSigningKey := viper.GetString(config.KeyInternalTokenSigningKey)
 	if tokenSigningKey == "" {
 		// Should never happen
-		return "", "", errors.New("tokenSigningKey is empty in the configuration")
-	}
-
-	// Random seed
-	seed, err = utils.RandomString()
-	if err != nil {
-		return "", "", err
+		return "", errors.New("tokenSigningKey is empty in the configuration")
 	}
 
 	// Base string to hash
@@ -219,7 +227,7 @@ func createStateToken(c *gin.Context) (stateToken string, seed string, err error
 	res := h.Sum(nil)
 
 	// Return the hash encoded as base64url
-	return base64.RawURLEncoding.EncodeToString(res), seed, nil
+	return base64.RawURLEncoding.EncodeToString(res), nil
 }
 
 func validateStateToken(c *gin.Context, stateToken string, seed string) bool {

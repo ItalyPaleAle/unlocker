@@ -181,8 +181,13 @@ function UpdateList(el: pendingRequestItem) {
     list = list
 }
 
+let hasRedirected = false
 function RedirectToAuth() {
-    window.location.href = URLPrefix + '/auth'
+    if (!hasRedirected) {
+        // Use a flag to prevent multiple redirects
+        hasRedirected = true
+        window.location.href = URLPrefix + '/auth'
+    }
 }
 
 function SubmitAll(confirm: boolean) {
