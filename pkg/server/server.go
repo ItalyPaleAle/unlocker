@@ -129,8 +129,12 @@ func (s *Server) initAppServer() error {
 
 	// Add routes
 	s.appRouter.GET("/healthz", gin.WrapF(s.RouteHealthzHandler))
-	s.appRouter.POST("/wrap", allowIpMw, s.RouteWrapUnwrap(OperationWrap))
-	s.appRouter.POST("/unwrap", allowIpMw, s.RouteWrapUnwrap(OperationUnwrap))
+	s.appRouter.POST("/encrypt", allowIpMw, s.RouteOperation(OperationEncrypt))
+	s.appRouter.POST("/decrypt", allowIpMw, s.RouteOperation(OperationDecrypt))
+	s.appRouter.POST("/sign", allowIpMw, s.RouteOperation(OperationSign))
+	s.appRouter.POST("/verify", allowIpMw, s.RouteOperation(OperationVerify))
+	s.appRouter.POST("/wrap", allowIpMw, s.RouteOperation(OperationWrap))
+	s.appRouter.POST("/unwrap", allowIpMw, s.RouteOperation(OperationUnwrap))
 	s.appRouter.GET("/result/:state", allowIpMw, s.RouteResult)
 	s.appRouter.GET("/auth", s.RouteAuth)
 	s.appRouter.GET("/auth/confirm", codeFilterLogMw, s.RouteAuthConfirm)

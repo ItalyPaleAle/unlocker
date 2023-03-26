@@ -7,13 +7,25 @@ import (
 type requestOperation uint8
 
 const (
-	OperationWrap requestOperation = iota
+	OperationEncrypt requestOperation = iota
+	OperationDecrypt
+	OperationSign
+	OperationVerify
+	OperationWrap
 	OperationUnwrap
 )
 
 // String representation
 func (r requestOperation) String() string {
 	switch r {
+	case OperationEncrypt:
+		return "encrypt"
+	case OperationDecrypt:
+		return "decrypt"
+	case OperationSign:
+		return "sign"
+	case OperationVerify:
+		return "verify"
 	case OperationWrap:
 		return "wrap"
 	case OperationUnwrap:
@@ -56,18 +68,23 @@ func (r requestStatus) String() string {
 // requestState contains a state request
 // All fields have tag `json:"-"` to prevent accidental exposure
 type requestState struct {
-	Status     requestStatus    `json:"-"`
 	Operation  requestOperation `json:"-"`
+	Status     requestStatus    `json:"-"`
 	Processing bool             `json:"-"`
-	Input      []byte           `json:"-"`
-	Output     []byte           `json:"-"`
-	Vault      string           `json:"-"`
-	KeyId      string           `json:"-"`
-	KeyVersion string           `json:"-"`
-	Requestor  string           `json:"-"`
-	Date       time.Time        `json:"-"`
-	Expiry     time.Time        `json:"-"`
-	Note       string           `json:"-"`
+
+	Vault      string `json:"-"`
+	KeyId      string `json:"-"`
+	KeyVersion string `json:"-"`
+
+	Algorithm      string `json:"-"`
+	Input          []byte `json:"-"`
+	Output         []byte `json:"-"`
+	AdditionalData []byte `json:"-"`
+
+	Requestor string    `json:"-"`
+	Date      time.Time `json:"-"`
+	Expiry    time.Time `json:"-"`
+	Note      string    `json:"-"`
 }
 
 // Expired returns true if the request has expired
