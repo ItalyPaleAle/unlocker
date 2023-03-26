@@ -119,9 +119,13 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestSta
 	)
 	switch state.Operation {
 	case OperationEncrypt:
+		err = errors.New("unimplemented")
 	case OperationDecrypt:
+		err = errors.New("unimplemented")
 	case OperationSign:
+		err = errors.New("unimplemented")
 	case OperationVerify:
+		err = errors.New("unimplemented")
 	case OperationWrap:
 		output, err = akv.WrapKey(c.Request.Context(), state.Vault, state.KeyId, state.KeyVersion, state.Input)
 	case OperationUnwrap:

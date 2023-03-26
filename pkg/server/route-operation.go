@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/spf13/cast"
 	"github.com/spf13/viper"
 
 	"github.com/italypaleale/unlocker/pkg/config"
@@ -102,7 +103,7 @@ type requestObject struct {
 	Value          string `json:"value" form:"value"`
 	AdditionalData string `json:"additionalData" form:"additionalData"`
 
-	Timeout string `json:"timeout" form:"timeout"`
+	Timeout any    `json:"timeout" form:"timeout"`
 	Note    string `json:"note" form:"note"`
 
 	timeoutDuration     time.Duration
@@ -143,17 +144,18 @@ func (req *requestObject) Parse() (err error) {
 	// Parse timeout
 	// If it's just a number, interpret it as seconds
 	// Otherwise, parse it as a Go duration
-	if req.Timeout == "" {
-		req.Timeout = viper.GetString(config.KeyRequestTimeout)
+	timeoutStr := cast.ToString(req.Timeout)
+	if timeoutStr == "" {
+		timeoutStr = viper.GetString(config.KeyRequestTimeout)
 	}
-	if durationNumber.MatchString(req.Timeout) {
-		timeout, _ := strconv.Atoi(req.Timeout)
+	if durationNumber.MatchString(timeoutStr) {
+		timeout, _ := strconv.Atoi(timeoutStr)
 		if timeout > 0 {
 			req.timeoutDuration = time.Duration(timeout) * time.Second
 		}
 	} else {
 		var timeout time.Duration
-		timeout, err = time.ParseDuration(req.Timeout)
+		timeout, err = time.ParseDuration(timeoutStr)
 		if err != nil {
 			return errors.New("invalid parameter 'timeout'")
 		}
