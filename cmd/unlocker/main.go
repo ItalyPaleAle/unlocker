@@ -149,18 +149,18 @@ func loadConfig() {
 	}
 
 	// Generate random tokenSigningKey if needed
-	if viper.GetString(config.KeyTokenSigningKey) == "" {
+	tokenSigningKey := viper.GetString(config.KeyTokenSigningKey)
+	if tokenSigningKey == "" {
 		appLogger.Raw().Debug().Msg("No 'tokenSigningKey' found in the configuration: a random one will be generated")
 
-		tokenSigningKey, err := utils.RandomString()
+		tokenSigningKey, err = utils.RandomString()
 		if err != nil {
 			appLogger.Raw().Fatal().
 				AnErr("error", err).
 				Msg("Failed to generate random tokenSigningKey")
 		}
-
-		viper.Set(config.KeyInternalTokenSigningKey, tokenSigningKey)
 	}
+	viper.Set(config.KeyInternalTokenSigningKey, tokenSigningKey)
 
 	// Set the cookie keys
 	// This panics in case of errors
