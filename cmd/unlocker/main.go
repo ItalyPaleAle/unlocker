@@ -56,6 +56,10 @@ func main() {
 		<-ch
 		appLogger.Raw().Info().Msg("Received interrupt signal. Shutting down…")
 		cancel()
+
+		// If we get another interrupt signal while we're shutting down, terminate immediately
+		<-ch
+		appLogger.Raw().Fatal().Msg("Received a second interrupt signal. Forcing a shutdown…")
 	}()
 
 	// Start the server in background and block until the server is shut down (gracefully)
