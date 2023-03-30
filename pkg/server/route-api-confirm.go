@@ -31,31 +31,28 @@ func (s *Server) RouteApiConfirmPost(c *gin.Context) {
 	// Get the request
 	s.lock.Lock()
 	state, ok := s.states[req.StateId]
-	if !ok || state == nil {
+	switch {
+	case !ok || state == nil:
 		_ = c.Error(errors.New("State object not found or expired"))
 		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("State not found or expired"))
 		s.lock.Unlock()
 		return
-	}
-	if state.Expired() {
+	case state.Expired():
 		_ = c.Error(errors.New("State object is expired"))
 		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("State not found or expired"))
 		s.lock.Unlock()
 		return
-	}
-	if state.Status != StatusPending {
+	case state.Status != StatusPending:
 		_ = c.Error(errors.New("Request already completed"))
 		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Request already completed"))
 		s.lock.Unlock()
 		return
-	}
-	if state.Processing {
+	case state.Processing:
 		_ = c.Error(errors.New("Request is already being processed"))
 		c.AbortWithStatusJSON(http.StatusConflict, ErrorResponse("Request is already being processed"))
 		s.lock.Unlock()
 		return
-	}
-	if (req.Confirm && req.Cancel) || (!req.Confirm && !req.Cancel) {
+	case (req.Confirm && req.Cancel) || (!req.Confirm && !req.Cancel):
 		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("One and only one of confirm and cancel must be set to true in the body"))
 		s.lock.Unlock()
 		return
@@ -113,20 +110,20 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestSta
 	start := time.Now()
 
 	// Init the Key Vault client
-	akv := keyvault.Client{}
-	err := akv.Init(at, expiration)
-	if err != nil {
-		_ = c.Error(err)
-		c.AbortWithStatusJSON(http.StatusInternalServerError, InternalServerError)
-		return
-	}
+	akv := keyvault.NewClient(at, expiration)
 
 	// Make the request
-	var output []byte
-	if state.Operation == OperationWrap {
+	var (
+		output []byte
+		err    error
+	)
+	switch state.Operation {
+	case OperationWrap:
 		output, err = akv.WrapKey(c.Request.Context(), state.Vault, state.KeyId, state.KeyVersion, state.Input)
-	} else if state.Operation == OperationUnwrap {
+	case OperationUnwrap:
 		output, err = akv.UnwrapKey(c.Request.Context(), state.Vault, state.KeyId, state.KeyVersion, state.Input)
+	default:
+		err = fmt.Errorf("invalid operation %s", state.Operation)
 	}
 	if err != nil {
 		_ = c.Error(err)
@@ -151,7 +148,7 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestSta
 
 	// Ensure the request hasn't expired in the meanwhile
 	if state.Expired() || state.Status != StatusPending {
-		_ = c.Error(errors.New("State object is expired after receiving response from Key Vault"))
+		_ = c.Error(errors.New("state object is expired after receiving response from Key Vault"))
 		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("State not found or expired"))
 		return
 	}
@@ -163,7 +160,11 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestSta
 
 	// Response
 	c.Set("log-message", "Operation confirmed: "+stateId)
-	c.JSON(http.StatusOK, map[string]bool{"confirmed": true})
+	c.JSON(http.StatusOK, struct {
+		Confirmed bool `json:"confirmed"`
+	}{
+		Confirmed: true,
+	})
 
 	// Send a notification to the subscriber if any
 	s.notifySubscriber(stateId, state)
@@ -175,7 +176,11 @@ func (s *Server) handleCancel(c *gin.Context, stateId string, state *requestStat
 
 	// Response
 	c.Set("log-message", "Operation canceled: "+stateId)
-	c.JSON(http.StatusOK, map[string]bool{"canceled": true})
+	c.JSON(http.StatusOK, struct {
+		Canceled bool `json:"canceled"`
+	}{
+		Canceled: true,
+	})
 }
 
 // Marks a request as canceled and sends a notification to the subscribers
