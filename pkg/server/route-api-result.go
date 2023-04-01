@@ -44,27 +44,26 @@ func (s *Server) RouteApiResult(c *gin.Context) {
 	s.lock.Unlock()
 
 	pendingReq := &requestState{Status: StatusPending}
-	for {
-		select {
-		case <-c.Request.Context().Done():
-			// Client has probably disconnected at this point, but just respond with the pending message
-			// We need a lock because we're modifying s.states inside the method
-			s.lock.Lock()
-			s.sendResponse(c, stateId, pendingReq, rawResult)
-			s.lock.Unlock()
-			return
-		case state = <-watch:
-			// If res is nil, the channel was closed (perhaps because another request evicted this), so respond with the pending message
-			if state == nil {
-				state = pendingReq
-			}
-			// Send the response
-			// We need a lock because we're modifying s.states inside the method
-			s.lock.Lock()
-			s.sendResponse(c, stateId, state, rawResult)
-			s.lock.Unlock()
-			return
+
+	select {
+	case <-c.Request.Context().Done():
+		// Client has probably disconnected at this point, but just respond with the pending message
+		// We need a lock because we're modifying s.states inside the method
+		s.lock.Lock()
+		s.sendResponse(c, stateId, pendingReq, rawResult)
+		s.unsubscribeToState(stateId, watch)
+		s.lock.Unlock()
+	case state = <-watch:
+		// If res is nil, the channel was closed (perhaps because another request evicted this), so respond with the pending message
+		if state == nil {
+			state = pendingReq
 		}
+		// Send the response
+		// We need a lock because we're modifying s.states inside the method
+		s.lock.Lock()
+		s.sendResponse(c, stateId, state, rawResult)
+		s.unsubscribeToState(stateId, watch)
+		s.lock.Unlock()
 	}
 }
 

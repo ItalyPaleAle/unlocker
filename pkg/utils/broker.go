@@ -9,14 +9,13 @@ import (
 type Broker[T any] struct {
 	lock        sync.RWMutex
 	subscribers map[chan T]struct{}
-	active      bool
+	stopped     bool
 }
 
 // NewBroker returns a new Broker object
 func NewBroker[T any]() *Broker[T] {
 	return &Broker[T]{
 		subscribers: map[chan T]struct{}{},
-		active:      true,
 	}
 }
 
@@ -25,8 +24,8 @@ func (b *Broker[T]) Subscribe() (chan T, error) {
 	b.lock.Lock()
 	defer b.lock.Unlock()
 
-	if !b.active {
-		return nil, errors.New("broker is inactive")
+	if b.stopped {
+		return nil, errors.New("broker is stopped")
 	}
 
 	ch := make(chan T)
@@ -59,7 +58,7 @@ func (b *Broker[T]) Shutdown() {
 		close(ch)
 	}
 
-	b.active = false
+	b.stopped = true
 }
 
 // Publish sends a message to all subscribers

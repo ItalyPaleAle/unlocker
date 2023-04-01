@@ -296,8 +296,8 @@ func (s *Server) stopMetricsServer() error {
 // If another subscription to the same key exists, evicts that first
 // Important: invocations must be wrapped in s.lock being locked
 func (s *Server) subscribeToState(stateId string) chan *requestState {
-	ch, ok := s.subs[stateId]
-	if ok && ch != nil {
+	ch := s.subs[stateId]
+	if ch != nil {
 		// Close the previous subscription
 		close(ch)
 	}
@@ -308,12 +308,22 @@ func (s *Server) subscribeToState(stateId string) chan *requestState {
 	return ch
 }
 
+// Removes a subscription to a state by key, only if the channel matches the given one
+// Important: invocations must be wrapped in s.lock being locked
+func (s *Server) unsubscribeToState(stateId string, watch chan *requestState) {
+	ch := s.subs[stateId]
+	if ch != nil && ch == watch {
+		close(ch)
+	}
+	delete(s.subs, stateId)
+}
+
 // Sends a notification to a state subscriber, if any
 // The channel is then closed right after
 // Important: invocations must be wrapped in s.lock being locked
 func (s *Server) notifySubscriber(stateId string, state *requestState) {
-	ch, ok := s.subs[stateId]
-	if !ok || ch == nil {
+	ch := s.subs[stateId]
+	if ch == nil {
 		return
 	}
 
@@ -336,8 +346,8 @@ func (s *Server) expireRequest(stateId string, validity time.Duration) {
 	defer s.lock.Unlock()
 
 	// Check if the request still exists
-	req, ok := s.states[stateId]
-	if !ok || req == nil {
+	req := s.states[stateId]
+	if req == nil {
 		return
 	}
 	s.log.Raw().Info().Msg("Removing expired operation " + stateId)
