@@ -33,22 +33,22 @@ func (s *Server) RouteApiConfirmPost(c *gin.Context) {
 	state, ok := s.states[req.StateId]
 	switch {
 	case !ok || state == nil:
-		_ = c.Error(errors.New("State object not found or expired"))
+		_ = c.Error(errors.New("state object not found or expired"))
 		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("State not found or expired"))
 		s.lock.Unlock()
 		return
 	case state.Expired():
-		_ = c.Error(errors.New("State object is expired"))
+		_ = c.Error(errors.New("state object is expired"))
 		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("State not found or expired"))
 		s.lock.Unlock()
 		return
 	case state.Status != StatusPending:
-		_ = c.Error(errors.New("Request already completed"))
+		_ = c.Error(errors.New("request already completed"))
 		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Request already completed"))
 		s.lock.Unlock()
 		return
 	case state.Processing:
-		_ = c.Error(errors.New("Request is already being processed"))
+		_ = c.Error(errors.New("request is already being processed"))
 		c.AbortWithStatusJSON(http.StatusConflict, ErrorResponse("Request is already being processed"))
 		s.lock.Unlock()
 		return
