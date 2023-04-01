@@ -129,17 +129,17 @@ func (s *Server) initAppServer() error {
 
 	// Add routes
 	s.appRouter.GET("/healthz", gin.WrapF(s.RouteHealthzHandler))
-	s.appRouter.POST("/encrypt", allowIpMw, s.RouteOperation(OperationEncrypt))
-	s.appRouter.POST("/decrypt", allowIpMw, s.RouteOperation(OperationDecrypt))
-	s.appRouter.POST("/sign", allowIpMw, s.RouteOperation(OperationSign))
-	s.appRouter.POST("/verify", allowIpMw, s.RouteOperation(OperationVerify))
-	s.appRouter.POST("/wrap", allowIpMw, s.RouteOperation(OperationWrap))
-	s.appRouter.POST("/unwrap", allowIpMw, s.RouteOperation(OperationUnwrap))
-	s.appRouter.GET("/result/:state", allowIpMw, s.RouteResult)
+	s.appRouter.POST("/api/subtle/encrypt", allowIpMw, s.RouteApiSubtle(OperationEncrypt))
+	s.appRouter.POST("/api/subtle/decrypt", allowIpMw, s.RouteApiSubtle(OperationDecrypt))
+	s.appRouter.POST("/api/subtle/sign", allowIpMw, s.RouteApiSubtle(OperationSign))
+	s.appRouter.POST("/api/subtle/verify", allowIpMw, s.RouteApiSubtle(OperationVerify))
+	s.appRouter.POST("/api/subtle/wrap", allowIpMw, s.RouteApiSubtle(OperationWrap))
+	s.appRouter.POST("/api/subtle/unwrap", allowIpMw, s.RouteApiSubtle(OperationUnwrap))
+	s.appRouter.GET("/api/result/:state", allowIpMw, s.RouteApiResult)
 	s.appRouter.GET("/auth", s.RouteAuth)
 	s.appRouter.GET("/auth/confirm", codeFilterLogMw, s.RouteAuthConfirm)
-	s.appRouter.GET("/api/list", s.AccessTokenMiddleware(true), s.RouteApiListGet)
-	s.appRouter.POST("/api/confirm", s.AccessTokenMiddleware(true), s.RouteApiConfirmPost)
+	s.appRouter.GET("/client/list", s.AccessTokenMiddleware(true), s.RouteClientListGet)
+	s.appRouter.POST("/client/confirm", s.AccessTokenMiddleware(true), s.RouteClientConfirmPost)
 
 	// Static files as fallback
 	s.appRouter.NoRoute(s.serveClient())

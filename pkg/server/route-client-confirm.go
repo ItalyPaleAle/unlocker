@@ -12,9 +12,9 @@ import (
 	"github.com/italypaleale/unlocker/pkg/keyvault"
 )
 
-// RouteApiConfirmPost is the handler for the POST /api/confirm request
+// RouteClientConfirmPost is the handler for the POST /client/confirm request
 // This receives the results of the confirm/reject action
-func (s *Server) RouteApiConfirmPost(c *gin.Context) {
+func (s *Server) RouteClientConfirmPost(c *gin.Context) {
 	// Get the fields from the body
 	req := &confirmRequest{}
 	err := c.Bind(req)

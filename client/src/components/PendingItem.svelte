@@ -125,7 +125,7 @@ export function submit(confirm: boolean) {
     item.status = pendingRequestStatus.pendingRequestProcessing_Client
 
     submitting = Promise.resolve()
-        .then(() => Request<{confirmed?: boolean, canceled?: boolean}>('/api/confirm', {
+        .then(() => Request<{confirmed?: boolean, canceled?: boolean}>('/client/confirm', {
             postData: body,
             // Set timeout to 60s as this operation can take longer
             timeout: 60000

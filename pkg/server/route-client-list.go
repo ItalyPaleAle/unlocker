@@ -11,23 +11,23 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type apiListResponse []requestStatePublic
+type clientListResponse []requestStatePublic
 
-// RouteApiListGet is the handler for the GET /api/list request
+// RouteClientListGet is the handler for the GET /client/list request
 // This returns the list of all pending requests
 // If the Accept header is `application/x-ndjson`, then this sends a stream of records, updated as soon as they come in, using the NDJSON format (https://github.com/ndjson/ndjson-spec)
-func (s *Server) RouteApiListGet(c *gin.Context) {
+func (s *Server) RouteClientListGet(c *gin.Context) {
 	accept := c.GetHeader("accept")
 	if strings.ToLower(accept) == "application/x-ndjson" {
-		s.routeApiListGetStream(c)
+		s.routeClientListGetStream(c)
 	} else {
-		s.routeApiListGetSingle(c)
+		s.routeClientListGetSingle(c)
 	}
 }
 
 // Returns the response as a single JSON fragment
-func (s *Server) routeApiListGetSingle(c *gin.Context) {
-	res := apiListResponse{}
+func (s *Server) routeClientListGetSingle(c *gin.Context) {
+	res := clientListResponse{}
 
 	// Get the list of pending requests
 	s.lock.RLock()
@@ -49,7 +49,7 @@ func (s *Server) routeApiListGetSingle(c *gin.Context) {
 }
 
 // Returns the response as a stream of NDJSON until the client disconnects or the session expires
-func (s *Server) routeApiListGetStream(c *gin.Context) {
+func (s *Server) routeClientListGetStream(c *gin.Context) {
 	// Timeout for the user's session
 	var timeout *time.Timer
 	expirationAny, ok := c.Get(contextKeySessionExpiration)
@@ -105,9 +105,6 @@ func (s *Server) routeApiListGetStream(c *gin.Context) {
 	// Send any data to the client
 	c.Writer.Flush()
 
-	// Unsubscribe once the method returns
-	defer s.pubsub.Unsubscribe(events)
-
 	// Process all events
 	// Stop when the request's context is canceled or if the user's session times out
 	// Every 200ms, we flush the data to the client
@@ -122,6 +119,7 @@ func (s *Server) routeApiListGetStream(c *gin.Context) {
 			c.Writer.Flush()
 		}
 	}()
+
 	for {
 		select {
 		case msg, more := <-events:

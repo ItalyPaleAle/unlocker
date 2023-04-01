@@ -9,9 +9,9 @@ import (
 	"github.com/italypaleale/unlocker/pkg/utils"
 )
 
-// RouteResult is the handler for the GET /result/:state request
+// RouteApiResult is the handler for the GET /api/result/:state request
 // This can be invoked by the app to periodically poll for the result
-func (s *Server) RouteResult(c *gin.Context) {
+func (s *Server) RouteApiResult(c *gin.Context) {
 	// Get the state parameter
 	stateId := c.Param("state")
 	if stateId == "" {

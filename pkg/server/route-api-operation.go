@@ -20,17 +20,17 @@ import (
 	"github.com/italypaleale/unlocker/pkg/utils"
 )
 
-// RouteOperation is the handler for the routes that perform operations:
-// - POST /encrypt
-// - POST /decrypt
-// - POST /sign
-// - POST /verify
-// - POST /wrap
-// - POST /unwrap
-func (s *Server) RouteOperation(op requestOperation) gin.HandlerFunc {
+// RouteApiSubtle is the handler for the routes that perform subtle operations:
+// - POST /api/subtle/encrypt
+// - POST /api/subtle/decrypt
+// - POST /api/subtle/sign
+// - POST /api/subtle/verify
+// - POST /api/subtle/wrap
+// - POST /api/subtle/unwrap
+func (s *Server) RouteApiSubtle(op requestOperation) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get the fields from the body
-		req := &requestObject{}
+		req := &subtleRequest{}
 		err := c.Bind(req)
 		if err != nil {
 			_ = c.Error(err)
@@ -94,7 +94,7 @@ func (s *Server) RouteOperation(op requestOperation) gin.HandlerFunc {
 	}
 }
 
-type requestObject struct {
+type subtleRequest struct {
 	Vault      string `json:"vault" form:"vault"`
 	KeyId      string `json:"keyId" form:"keyId"`
 	KeyVersion string `json:"keyVersion" form:"keyVersion"`
@@ -117,7 +117,7 @@ var (
 )
 
 // Parse and validate the request object
-func (req *requestObject) Parse() (err error) {
+func (req *subtleRequest) Parse() (err error) {
 	if req.Vault == "" {
 		return errors.New("missing parameter 'vault'")
 	}
@@ -183,7 +183,7 @@ func (req *requestObject) Parse() (err error) {
 }
 
 // GetRequestState returns the requestState object from this request
-func (req *requestObject) GetRequestState(op requestOperation, requestor string) *requestState {
+func (req *subtleRequest) GetRequestState(op requestOperation, requestor string) *requestState {
 	now := time.Now()
 	return &requestState{
 		Operation: op,

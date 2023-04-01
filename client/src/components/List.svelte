@@ -91,7 +91,7 @@ function Subscribe(): () => void {
                 controller = new AbortController()
 
                 // We can't use the higher-level Request API here because we need to get access to the stream
-                const res = await fetch(URLPrefix + '/api/list', {
+                const res = await fetch(URLPrefix + '/client/list', {
                     headers: new Headers({
                         accept: 'application/x-ndjson '
                     }),
