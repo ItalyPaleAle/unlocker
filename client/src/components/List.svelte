@@ -91,7 +91,7 @@ function Subscribe(): () => void {
                 controller = new AbortController()
 
                 // We can't use the higher-level Request API here because we need to get access to the stream
-                const res = await fetch(URLPrefix + '/client/list', {
+                const res = await fetch(URLPrefix + '/api/list', {
                     headers: new Headers({
                         accept: 'application/x-ndjson '
                     }),
@@ -186,7 +186,7 @@ function RedirectToAuth() {
     if (!hasRedirected) {
         // Use a flag to prevent multiple redirects
         hasRedirected = true
-        window.location.href = URLPrefix + '/auth'
+        window.location.href = URLPrefix + '/auth/signin'
     }
 }
 

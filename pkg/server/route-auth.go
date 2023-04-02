@@ -42,9 +42,9 @@ type AccessToken struct {
 	ErrorDescription string `json:"error_description"`
 }
 
-// RouteAuth is the handler for the GET /auth request
+// RouteAuthSignin is the handler for the GET /auth/signin request
 // This redirects the user to the page where they can sign in
-func (s *Server) RouteAuth(c *gin.Context) {
+func (s *Server) RouteAuthSignin(c *gin.Context) {
 	// Check if we already have a state cookie that was issued recently
 	// It can happen that clients are redirected to the auth page more than once at the same time
 	seed, ttl, err := getSecureCookie(c, authStateCookieName)

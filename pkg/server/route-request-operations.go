@@ -20,18 +20,14 @@ import (
 	"github.com/italypaleale/unlocker/pkg/utils"
 )
 
-// RouteApiSubtle is the handler for the routes that perform subtle operations:
-// - POST /api/subtle/encrypt
-// - POST /api/subtle/decrypt
-// - POST /api/subtle/sign
-// - POST /api/subtle/verify
-// - POST /api/subtle/wrap
-// - POST /api/subtle/unwrap
-func (s *Server) RouteApiSubtle(op requestOperation) gin.HandlerFunc {
-	return s.createOperationRoute(op, nil)
-}
-
-func (s *Server) createOperationRoute(op requestOperation, setReqOpts func(req *subtleRequest)) gin.HandlerFunc {
+// RouteRequestOperations is the handler for the routes that perform operations:
+// - POST /request/encrypt
+// - POST /request/decrypt
+// - POST /request/sign
+// - POST /request/verify
+// - POST /request/wrap
+// - POST /request/unwrap
+func (s *Server) RouteRequestOperations(op requestOperation) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get the fields from the body
 		req := &subtleRequest{}
@@ -40,9 +36,6 @@ func (s *Server) createOperationRoute(op requestOperation, setReqOpts func(req *
 			_ = c.Error(err)
 			c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Invalid request body"))
 			return
-		}
-		if setReqOpts != nil {
-			setReqOpts(req)
 		}
 		err = req.Parse()
 		if err != nil {

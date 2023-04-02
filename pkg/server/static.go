@@ -66,7 +66,7 @@ func prepareStaticResponse(c *gin.Context) (ok bool) {
 	if path == "" || path == "index.html" {
 		v, err := c.Cookie(atCookieName)
 		if err != nil || v == "" {
-			c.Header("location", "/auth")
+			c.Header("location", "/auth/signin")
 			c.Status(http.StatusFound)
 			return false
 		}

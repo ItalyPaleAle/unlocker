@@ -131,32 +131,31 @@ func (s *Server) initAppServer() error {
 	// Start with the healthz route
 	s.appRouter.GET("/healthz", gin.WrapF(s.RouteHealthzHandler))
 
-	// APIs - these share the /api prefix and all use the allow IP middleware
-	apiRouteGroup := s.appRouter.Group("/api", allowIpMw)
-	apiRouteGroup.GET("/result/:state", s.RouteApiResult)
-	apiRouteGroup.POST("/subtle/encrypt", s.RouteApiSubtle(OperationEncrypt))
-	apiRouteGroup.POST("/subtle/decrypt", s.RouteApiSubtle(OperationDecrypt))
-	apiRouteGroup.POST("/subtle/sign", s.RouteApiSubtle(OperationSign))
-	apiRouteGroup.POST("/subtle/verify", s.RouteApiSubtle(OperationVerify))
-	apiRouteGroup.POST("/subtle/wrap", s.RouteApiSubtle(OperationWrap))
-	apiRouteGroup.POST("/subtle/unwrap", s.RouteApiSubtle(OperationUnwrap))
-	apiRouteGroup.POST("/keywrap", s.RouteApiKeywrapping(OperationWrap))
-	apiRouteGroup.POST("/keyunwrap", s.RouteApiKeywrapping(OperationUnwrap))
+	// Requests - these share the /request prefix and all use the allow IP middleware
+	requestRouteGroup := s.appRouter.Group("/request", allowIpMw)
+	requestRouteGroup.GET("/result/:state", s.RouteRequestResult)
+	requestRouteGroup.POST("/encrypt", s.RouteRequestOperations(OperationEncrypt))
+	requestRouteGroup.POST("/decrypt", s.RouteRequestOperations(OperationDecrypt))
+	requestRouteGroup.POST("/sign", s.RouteRequestOperations(OperationSign))
+	requestRouteGroup.POST("/verify", s.RouteRequestOperations(OperationVerify))
+	requestRouteGroup.POST("/wrap", s.RouteRequestOperations(OperationWrap))
+	requestRouteGroup.POST("/unwrap", s.RouteRequestOperations(OperationUnwrap))
 
-	// Client routes - these share the /client prefix
-	clientRouteGroup := s.appRouter.Group("/client")
-	clientRouteGroup.GET("/list",
+	// API routes - these share the /api prefix
+	apiRouteGroup := s.appRouter.Group("/api")
+	apiRouteGroup.GET("/list",
 		s.AccessTokenMiddleware(AccessTokenMiddlewareOpts{Required: true}),
-		s.RouteClientListGet,
+		s.RouteApiListGet,
 	)
-	clientRouteGroup.POST("/confirm",
+	apiRouteGroup.POST("/confirm",
 		s.AccessTokenMiddleware(AccessTokenMiddlewareOpts{Required: true, AllowAccessTokenInHeader: true}),
-		s.RouteClientConfirmPost,
+		s.RouteApiConfirmPost,
 	)
 
-	// Auth routes
-	s.appRouter.GET("/auth", s.RouteAuth)
-	s.appRouter.GET("/auth/confirm", codeFilterLogMw, s.RouteAuthConfirm)
+	// Auth routes - these share the /auth prefix
+	authRouteGroup := s.appRouter.Group("/auth")
+	authRouteGroup.GET("/signin", s.RouteAuthSignin)
+	authRouteGroup.GET("/confirm", codeFilterLogMw, s.RouteAuthConfirm)
 
 	// Static files as fallback
 	s.appRouter.NoRoute(s.serveClient())

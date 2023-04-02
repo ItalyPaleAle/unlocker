@@ -11,23 +11,23 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-type clientListResponse []requestStatePublic
+type apiListResponse []requestStatePublic
 
-// RouteClientListGet is the handler for the GET /client/list request
+// RouteApiListGet is the handler for the GET /api/list request
 // This returns the list of all pending requests
 // If the Accept header is `application/x-ndjson`, then this sends a stream of records, updated as soon as they come in, using the NDJSON format (https://github.com/ndjson/ndjson-spec)
-func (s *Server) RouteClientListGet(c *gin.Context) {
+func (s *Server) RouteApiListGet(c *gin.Context) {
 	accept := c.GetHeader("accept")
 	if strings.ToLower(accept) == "application/x-ndjson" {
-		s.routeClientListGetStream(c)
+		s.routeApiListGetStream(c)
 	} else {
-		s.routeClientListGetSingle(c)
+		s.routeApiListGetSingle(c)
 	}
 }
 
 // Returns the response as a single JSON fragment
-func (s *Server) routeClientListGetSingle(c *gin.Context) {
-	res := clientListResponse{}
+func (s *Server) routeApiListGetSingle(c *gin.Context) {
+	res := apiListResponse{}
 
 	// Get the list of pending requests
 	s.lock.RLock()
@@ -49,7 +49,7 @@ func (s *Server) routeClientListGetSingle(c *gin.Context) {
 }
 
 // Returns the response as a stream of NDJSON until the client disconnects or the session expires
-func (s *Server) routeClientListGetStream(c *gin.Context) {
+func (s *Server) routeApiListGetStream(c *gin.Context) {
 	// Timeout for the user's session
 	var timeout *time.Timer
 	expirationAny, ok := c.Get(contextKeySessionExpiration)
