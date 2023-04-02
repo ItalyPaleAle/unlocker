@@ -128,20 +128,35 @@ func (s *Server) initAppServer() error {
 	}
 
 	// Add routes
+	// Start with the healthz route
 	s.appRouter.GET("/healthz", gin.WrapF(s.RouteHealthzHandler))
-	s.appRouter.GET("/api/result/:state", allowIpMw, s.RouteApiResult)
-	s.appRouter.POST("/api/subtle/encrypt", allowIpMw, s.RouteApiSubtle(OperationEncrypt))
-	s.appRouter.POST("/api/subtle/decrypt", allowIpMw, s.RouteApiSubtle(OperationDecrypt))
-	s.appRouter.POST("/api/subtle/sign", allowIpMw, s.RouteApiSubtle(OperationSign))
-	s.appRouter.POST("/api/subtle/verify", allowIpMw, s.RouteApiSubtle(OperationVerify))
-	s.appRouter.POST("/api/subtle/wrap", allowIpMw, s.RouteApiSubtle(OperationWrap))
-	s.appRouter.POST("/api/subtle/unwrap", allowIpMw, s.RouteApiSubtle(OperationUnwrap))
-	s.appRouter.POST("/api/keywrap", allowIpMw, s.RouteApiKeywrapping(OperationWrap))
-	s.appRouter.POST("/api/keyunwrap", allowIpMw, s.RouteApiKeywrapping(OperationUnwrap))
+
+	// APIs - these share the /api prefix and all use the allow IP middleware
+	apiRouteGroup := s.appRouter.Group("/api", allowIpMw)
+	apiRouteGroup.GET("/result/:state", s.RouteApiResult)
+	apiRouteGroup.POST("/subtle/encrypt", s.RouteApiSubtle(OperationEncrypt))
+	apiRouteGroup.POST("/subtle/decrypt", s.RouteApiSubtle(OperationDecrypt))
+	apiRouteGroup.POST("/subtle/sign", s.RouteApiSubtle(OperationSign))
+	apiRouteGroup.POST("/subtle/verify", s.RouteApiSubtle(OperationVerify))
+	apiRouteGroup.POST("/subtle/wrap", s.RouteApiSubtle(OperationWrap))
+	apiRouteGroup.POST("/subtle/unwrap", s.RouteApiSubtle(OperationUnwrap))
+	apiRouteGroup.POST("/keywrap", s.RouteApiKeywrapping(OperationWrap))
+	apiRouteGroup.POST("/keyunwrap", s.RouteApiKeywrapping(OperationUnwrap))
+
+	// Client routes - these share the /client prefix
+	clientRouteGroup := s.appRouter.Group("/client")
+	clientRouteGroup.GET("/list",
+		s.AccessTokenMiddleware(AccessTokenMiddlewareOpts{Required: true}),
+		s.RouteClientListGet,
+	)
+	clientRouteGroup.POST("/confirm",
+		s.AccessTokenMiddleware(AccessTokenMiddlewareOpts{Required: true, AllowAccessTokenInHeader: true}),
+		s.RouteClientConfirmPost,
+	)
+
+	// Auth routes
 	s.appRouter.GET("/auth", s.RouteAuth)
 	s.appRouter.GET("/auth/confirm", codeFilterLogMw, s.RouteAuthConfirm)
-	s.appRouter.GET("/client/list", s.AccessTokenMiddleware(true), s.RouteClientListGet)
-	s.appRouter.POST("/client/confirm", s.AccessTokenMiddleware(true), s.RouteClientConfirmPost)
 
 	// Static files as fallback
 	s.appRouter.NoRoute(s.serveClient())
