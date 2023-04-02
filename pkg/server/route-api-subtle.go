@@ -28,6 +28,10 @@ import (
 // - POST /api/subtle/wrap
 // - POST /api/subtle/unwrap
 func (s *Server) RouteApiSubtle(op requestOperation) gin.HandlerFunc {
+	return s.createOperationRoute(op, nil)
+}
+
+func (s *Server) createOperationRoute(op requestOperation, setReqOpts func(req *subtleRequest)) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get the fields from the body
 		req := &subtleRequest{}
@@ -36,6 +40,9 @@ func (s *Server) RouteApiSubtle(op requestOperation) gin.HandlerFunc {
 			_ = c.Error(err)
 			c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Invalid request body"))
 			return
+		}
+		if setReqOpts != nil {
+			setReqOpts(req)
 		}
 		err = req.Parse()
 		if err != nil {

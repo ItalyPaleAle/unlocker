@@ -129,13 +129,15 @@ func (s *Server) initAppServer() error {
 
 	// Add routes
 	s.appRouter.GET("/healthz", gin.WrapF(s.RouteHealthzHandler))
+	s.appRouter.GET("/api/result/:state", allowIpMw, s.RouteApiResult)
 	s.appRouter.POST("/api/subtle/encrypt", allowIpMw, s.RouteApiSubtle(OperationEncrypt))
 	s.appRouter.POST("/api/subtle/decrypt", allowIpMw, s.RouteApiSubtle(OperationDecrypt))
 	s.appRouter.POST("/api/subtle/sign", allowIpMw, s.RouteApiSubtle(OperationSign))
 	s.appRouter.POST("/api/subtle/verify", allowIpMw, s.RouteApiSubtle(OperationVerify))
 	s.appRouter.POST("/api/subtle/wrap", allowIpMw, s.RouteApiSubtle(OperationWrap))
 	s.appRouter.POST("/api/subtle/unwrap", allowIpMw, s.RouteApiSubtle(OperationUnwrap))
-	s.appRouter.GET("/api/result/:state", allowIpMw, s.RouteApiResult)
+	s.appRouter.POST("/api/keywrap", allowIpMw, s.RouteApiKeywrapping(OperationWrap))
+	s.appRouter.POST("/api/keyunwrap", allowIpMw, s.RouteApiKeywrapping(OperationUnwrap))
 	s.appRouter.GET("/auth", s.RouteAuth)
 	s.appRouter.GET("/auth/confirm", codeFilterLogMw, s.RouteAuthConfirm)
 	s.appRouter.GET("/client/list", s.AccessTokenMiddleware(true), s.RouteClientListGet)
