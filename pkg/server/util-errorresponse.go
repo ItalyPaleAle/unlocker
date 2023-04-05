@@ -9,7 +9,11 @@ type ErrorResponse string
 
 // MarshalJSON implements a JSON marshaller that returns an object with the error key
 func (e ErrorResponse) MarshalJSON() ([]byte, error) {
-	return json.Marshal(map[string]string{"error": string(e)})
+	return json.Marshal(struct {
+		Error string `json:"error"`
+	}{
+		Error: string(e),
+	})
 }
 
 // InternalServerError is an ErrorResponse for Internal Server Error messages

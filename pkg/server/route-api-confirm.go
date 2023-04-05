@@ -114,7 +114,7 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestSta
 
 	// Make the request
 	var (
-		output []byte
+		output keyvault.KeyVaultResponse
 		err    error
 	)
 	switch state.Operation {
@@ -126,10 +126,10 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestSta
 		err = errors.New("unimplemented")
 	case OperationVerify:
 		err = errors.New("unimplemented")
-	case OperationWrap:
-		output, err = akv.WrapKey(c.Request.Context(), state.Vault, state.KeyId, state.KeyVersion, state.Input)
-	case OperationUnwrap:
-		output, err = akv.UnwrapKey(c.Request.Context(), state.Vault, state.KeyId, state.KeyVersion, state.Input)
+	case OperationWrapKey:
+		output, err = akv.WrapKey(c.Request.Context(), state.Vault, state.KeyId, state.KeyVersion, state.AzkeysOperationParams())
+	case OperationUnwrapKey:
+		output, err = akv.UnwrapKey(c.Request.Context(), state.Vault, state.KeyId, state.KeyVersion, state.AzkeysOperationParams())
 	default:
 		err = fmt.Errorf("invalid operation %s", state.Operation)
 	}

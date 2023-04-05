@@ -20,6 +20,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/italypaleale/unlocker/pkg/config"
+	"github.com/italypaleale/unlocker/pkg/keyvault"
 	"github.com/italypaleale/unlocker/pkg/metrics"
 	"github.com/italypaleale/unlocker/pkg/utils"
 )
@@ -138,8 +139,8 @@ func (s *Server) initAppServer() error {
 	requestRouteGroup.POST("/decrypt", s.RouteRequestOperations(OperationDecrypt))
 	requestRouteGroup.POST("/sign", s.RouteRequestOperations(OperationSign))
 	requestRouteGroup.POST("/verify", s.RouteRequestOperations(OperationVerify))
-	requestRouteGroup.POST("/wrap", s.RouteRequestOperations(OperationWrap))
-	requestRouteGroup.POST("/unwrap", s.RouteRequestOperations(OperationUnwrap))
+	requestRouteGroup.POST("/wrapkey", s.RouteRequestOperations(OperationWrapKey))
+	requestRouteGroup.POST("/unwrapkey", s.RouteRequestOperations(OperationUnwrapKey))
 
 	// API routes - these share the /api prefix
 	apiRouteGroup := s.appRouter.Group("/api")
@@ -452,5 +453,6 @@ type operationResponse struct {
 	Pending bool   `json:"pending,omitempty"`
 	Done    bool   `json:"done,omitempty"`
 	Failed  bool   `json:"failed,omitempty"`
-	Value   string `json:"value,omitempty"`
+
+	keyvault.KeyVaultResponse `json:"response,omitempty"`
 }

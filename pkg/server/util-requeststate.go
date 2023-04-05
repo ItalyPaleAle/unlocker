@@ -2,6 +2,10 @@ package server
 
 import (
 	"time"
+
+	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
+	"github.com/Azure/azure-sdk-for-go/sdk/keyvault/azkeys"
+	"github.com/italypaleale/unlocker/pkg/keyvault"
 )
 
 type requestOperation uint8
@@ -11,8 +15,8 @@ const (
 	OperationDecrypt
 	OperationSign
 	OperationVerify
-	OperationWrap
-	OperationUnwrap
+	OperationWrapKey
+	OperationUnwrapKey
 )
 
 // String representation
@@ -26,9 +30,9 @@ func (r requestOperation) String() string {
 		return "sign"
 	case OperationVerify:
 		return "verify"
-	case OperationWrap:
+	case OperationWrapKey:
 		return "wrap"
-	case OperationUnwrap:
+	case OperationUnwrapKey:
 		return "unwrap"
 	default:
 		return ""
@@ -76,10 +80,12 @@ type requestState struct {
 	KeyId      string `json:"-"`
 	KeyVersion string `json:"-"`
 
-	Algorithm      string `json:"-"`
-	Input          []byte `json:"-"`
-	Output         []byte `json:"-"`
-	AdditionalData []byte `json:"-"`
+	Algorithm      string                    `json:"-"`
+	Input          []byte                    `json:"-"`
+	Output         keyvault.KeyVaultResponse `json:"-"`
+	AdditionalData []byte                    `json:"-"`
+	Nonce          []byte                    `json:"-"`
+	Tag            []byte                    `json:"-"`
 
 	Requestor string    `json:"-"`
 	Date      time.Time `json:"-"`
@@ -104,6 +110,17 @@ func (rs requestState) Public(stateId string) requestStatePublic {
 		Date:      rs.Date.Unix(),
 		Expiry:    rs.Expiry.Unix(),
 		Note:      rs.Note,
+	}
+}
+
+// AzkeysOperationParams returns the azkeys.KeyOperationsParameters object for this request, that can be used with the Azure SDK.
+func (rs requestState) AzkeysOperationParams() azkeys.KeyOperationsParameters {
+	return azkeys.KeyOperationsParameters{
+		Algorithm: to.Ptr(azkeys.JSONWebKeyEncryptionAlgorithm(rs.Algorithm)),
+		Value:     rs.Input,
+		AAD:       rs.AdditionalData,
+		IV:        rs.Nonce,
+		Tag:       rs.Tag,
 	}
 }
 

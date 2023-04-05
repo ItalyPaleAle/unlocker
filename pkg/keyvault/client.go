@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
-	"github.com/Azure/azure-sdk-for-go/sdk/azcore/to"
 	"github.com/Azure/azure-sdk-for-go/sdk/keyvault/azkeys"
 )
 
@@ -24,18 +23,8 @@ func NewClient(accessToken string, expiration time.Time) *Client {
 	}
 }
 
-// WrapKey wraps a key using the key-encryption-key stored in the Key Vault at keyUrl
-func (c *Client) WrapKey(ctx context.Context, vault, keyName, keyVersion string, key []byte) ([]byte, error) {
-	if vault == "" {
-		return nil, errors.New("argument vault is empty")
-	}
-	if keyName == "" {
-		return nil, errors.New("argument keyName is empty")
-	}
-	if len(key) == 0 {
-		return nil, errors.New("argument key is empty")
-	}
-
+// Encrypt a message using a key stored in the Key Vault
+func (c *Client) Encrypt(ctx context.Context, vault, keyName, keyVersion string, params azkeys.KeyOperationsParameters) (*KeyVaultEncryptResponse, error) {
 	// Get the client
 	client, err := c.getClient(vault)
 	if err != nil {
@@ -43,32 +32,26 @@ func (c *Client) WrapKey(ctx context.Context, vault, keyName, keyVersion string,
 	}
 
 	// Perform the operation
-	res, err := client.WrapKey(ctx, keyName, keyVersion, azkeys.KeyOperationsParameters{
-		Value:     key,
-		Algorithm: to.Ptr(azkeys.JSONWebKeyEncryptionAlgorithmRSAOAEP256),
-	}, nil)
+	res, err := client.Encrypt(ctx, keyName, keyVersion, params, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error from Azure Key Vault: %w", err)
 	}
-	if res.Result == nil {
-		return nil, errors.New("response from Azure Key Vault is empty")
+	if res.Result == nil || res.KID == nil {
+		return nil, errors.New("response from Azure Key Vault is invalid")
 	}
 
-	return res.Result, nil
+	return &KeyVaultEncryptResponse{
+		keyVaultResponseBase: keyVaultResponseBase{
+			keyID: string(*res.KID),
+		},
+		Data:  res.Result,
+		Nonce: params.IV,
+		Tag:   res.AuthenticationTag,
+	}, nil
 }
 
-// UnwrapKey unwrap a wrapped key using the key-encryption-key stored in the Key Vault at keyUrl
-func (c *Client) UnwrapKey(ctx context.Context, vault, keyName, keyVersion string, wrappedKey []byte) ([]byte, error) {
-	if vault == "" {
-		return nil, errors.New("argument vault is empty")
-	}
-	if keyName == "" {
-		return nil, errors.New("argument keyName is empty")
-	}
-	if len(wrappedKey) == 0 {
-		return nil, errors.New("argument wrappedKey is empty")
-	}
-
+// Decrypt a message using a key stored in the Key Vault.
+func (c *Client) Decrypt(ctx context.Context, vault, keyName, keyVersion string, params azkeys.KeyOperationsParameters) (*KeyVaultDecryptResponse, error) {
 	// Get the client
 	client, err := c.getClient(vault)
 	if err != nil {
@@ -76,18 +59,123 @@ func (c *Client) UnwrapKey(ctx context.Context, vault, keyName, keyVersion strin
 	}
 
 	// Perform the operation
-	res, err := client.UnwrapKey(ctx, keyName, keyVersion, azkeys.KeyOperationsParameters{
-		Value:     wrappedKey,
-		Algorithm: to.Ptr(azkeys.JSONWebKeyEncryptionAlgorithmRSAOAEP256),
-	}, nil)
+	res, err := client.Decrypt(ctx, keyName, keyVersion, params, nil)
 	if err != nil {
 		return nil, fmt.Errorf("error from Azure Key Vault: %w", err)
 	}
-	if res.Result == nil {
+	if res.Result == nil || res.KID == nil {
+		return nil, errors.New("response from Azure Key Vault is invalid")
+	}
+
+	return &KeyVaultDecryptResponse{
+		keyVaultResponseBase: keyVaultResponseBase{
+			keyID: string(*res.KID),
+		},
+		Data: res.Result,
+	}, nil
+}
+
+// WrapKey wraps a key using the key-encryption-key stored in the Key Vault
+func (c *Client) WrapKey(ctx context.Context, vault, keyName, keyVersion string, params azkeys.KeyOperationsParameters) (*KeyVaultEncryptResponse, error) {
+	// Get the client
+	client, err := c.getClient(vault)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get Azure Key Vault client: %w", err)
+	}
+
+	// Perform the operation
+	res, err := client.WrapKey(ctx, keyName, keyVersion, params, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error from Azure Key Vault: %w", err)
+	}
+	if res.Result == nil || res.KID == nil {
+		return nil, errors.New("response from Azure Key Vault is invalid")
+	}
+
+	return &KeyVaultEncryptResponse{
+		keyVaultResponseBase: keyVaultResponseBase{
+			keyID: string(*res.KID),
+		},
+		Data:  res.Result,
+		Nonce: params.IV,
+		Tag:   res.AuthenticationTag,
+	}, nil
+}
+
+// UnwrapKey unwrap a wrapped key using the key-encryption-key stored in the Key Vault
+func (c *Client) UnwrapKey(ctx context.Context, vault, keyName, keyVersion string, params azkeys.KeyOperationsParameters) (*KeyVaultDecryptResponse, error) {
+	// Get the client
+	client, err := c.getClient(vault)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get Azure Key Vault client: %w", err)
+	}
+
+	// Perform the operation
+	res, err := client.UnwrapKey(ctx, keyName, keyVersion, params, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error from Azure Key Vault: %w", err)
+	}
+	if res.Result == nil || res.KID == nil {
+		return nil, errors.New("response from Azure Key Vault is invalid")
+	}
+
+	return &KeyVaultDecryptResponse{
+		keyVaultResponseBase: keyVaultResponseBase{
+			keyID: string(*res.KID),
+		},
+		Data: res.Result,
+	}, nil
+}
+
+// Sign a message using a key stored in the Key Vault
+func (c *Client) Sign(ctx context.Context, vault, keyName, keyVersion string, params azkeys.SignParameters) (*KeyVaultSignResponse, error) {
+	// Get the client
+	client, err := c.getClient(vault)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get Azure Key Vault client: %w", err)
+	}
+
+	// Perform the operation
+	res, err := client.Sign(ctx, keyName, keyVersion, params, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error from Azure Key Vault: %w", err)
+	}
+	if res.Result == nil || res.KID == nil {
+		return nil, errors.New("response from Azure Key Vault is invalid")
+	}
+
+	return &KeyVaultSignResponse{
+		keyVaultResponseBase: keyVaultResponseBase{
+			keyID: string(*res.KID),
+		},
+		Data: res.Result,
+	}, nil
+}
+
+// Verify a signature using a key stored in the Key Vault
+func (c *Client) Verify(ctx context.Context, vault, keyName, keyVersion string, params azkeys.VerifyParameters) (*KeyVaultVerifyResponse, error) {
+	// Get the client
+	client, err := c.getClient(vault)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get Azure Key Vault client: %w", err)
+	}
+
+	// Perform the operation
+	res, err := client.Verify(ctx, keyName, keyVersion, params, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error from Azure Key Vault: %w", err)
+	}
+	if res.Value == nil {
 		return nil, errors.New("response from Azure Key Vault is empty")
 	}
 
-	return res.Result, nil
+	return &KeyVaultVerifyResponse{
+		keyVaultResponseBase: keyVaultResponseBase{
+			// Response from Azure Key Vault does not contain a key ID
+			keyID: "",
+		},
+		Valid: *res.Value,
+	}, nil
 }
 
 // vaultUrl returns the URL for the Azure Key Vault

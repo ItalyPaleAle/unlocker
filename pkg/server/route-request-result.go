@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/base64"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -78,12 +77,12 @@ func (s *Server) sendResponse(c *gin.Context, stateId string, state *requestStat
 	case StatusComplete:
 		// Respond with the result
 		if rawResult {
-			c.Data(http.StatusOK, "application/octet-stream", state.Output)
+			c.Data(http.StatusOK, "application/octet-stream", state.Output.Raw())
 		} else {
 			c.JSON(http.StatusOK, &operationResponse{
-				State: stateId,
-				Done:  true,
-				Value: base64.StdEncoding.EncodeToString(state.Output),
+				KeyVaultResponse: state.Output,
+				State:            stateId,
+				Done:             true,
 			})
 		}
 		// Remove from the states map
