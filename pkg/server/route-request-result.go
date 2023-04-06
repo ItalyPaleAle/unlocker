@@ -76,11 +76,14 @@ func (s *Server) sendResponse(c *gin.Context, stateId string, state *requestStat
 		})
 	case StatusComplete:
 		// Respond with the result
+		if keyID := state.Result.KeyID(); keyID != "" {
+			c.Header("x-key-id", keyID)
+		}
 		if rawResult {
-			c.Data(http.StatusOK, "application/octet-stream", state.Output.Raw())
+			c.Data(http.StatusOK, "application/octet-stream", state.Result.Raw())
 		} else {
 			c.JSON(http.StatusOK, &operationResponse{
-				KeyVaultResponse: state.Output,
+				KeyVaultResponse: state.Result,
 				State:            stateId,
 				Done:             true,
 			})

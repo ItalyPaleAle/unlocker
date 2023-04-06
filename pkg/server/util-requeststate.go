@@ -80,12 +80,15 @@ type requestState struct {
 	KeyId      string `json:"-"`
 	KeyVersion string `json:"-"`
 
-	Algorithm      string                    `json:"-"`
-	Input          []byte                    `json:"-"`
-	Output         keyvault.KeyVaultResponse `json:"-"`
-	AdditionalData []byte                    `json:"-"`
-	Nonce          []byte                    `json:"-"`
-	Tag            []byte                    `json:"-"`
+	Algorithm      string `json:"-"`
+	Value          []byte `json:"-"`
+	Digest         []byte `json:"-"`
+	Signature      []byte `json:"-"`
+	AdditionalData []byte `json:"-"`
+	Nonce          []byte `json:"-"`
+	Tag            []byte `json:"-"`
+
+	Result keyvault.KeyVaultResponse `json:"-"`
 
 	Requestor string    `json:"-"`
 	Date      time.Time `json:"-"`
@@ -113,14 +116,31 @@ func (rs requestState) Public(stateId string) requestStatePublic {
 	}
 }
 
-// AzkeysOperationParams returns the azkeys.KeyOperationsParameters object for this request, that can be used with the Azure SDK.
-func (rs requestState) AzkeysOperationParams() azkeys.KeyOperationsParameters {
+// AzkeysKeyOperationsParams returns the azkeys.KeyOperationsParameters object for this request, that can be used with the Azure SDK.
+func (rs requestState) AzkeysKeyOperationsParams() azkeys.KeyOperationsParameters {
 	return azkeys.KeyOperationsParameters{
 		Algorithm: to.Ptr(azkeys.JSONWebKeyEncryptionAlgorithm(rs.Algorithm)),
-		Value:     rs.Input,
+		Value:     rs.Value,
 		AAD:       rs.AdditionalData,
 		IV:        rs.Nonce,
 		Tag:       rs.Tag,
+	}
+}
+
+// AzkeysSignParams returns the azkeys.SignParameters object for this request, that can be used with the Azure SDK.
+func (rs requestState) AzkeysSignParams() azkeys.SignParameters {
+	return azkeys.SignParameters{
+		Algorithm: to.Ptr(azkeys.JSONWebKeySignatureAlgorithm(rs.Algorithm)),
+		Value:     rs.Digest,
+	}
+}
+
+// AzkeysVerifyParams returns the azkeys.VerifyParameters object for this request, that can be used with the Azure SDK.
+func (rs requestState) AzkeysVerifyParams() azkeys.VerifyParameters {
+	return azkeys.VerifyParameters{
+		Algorithm: to.Ptr(azkeys.JSONWebKeySignatureAlgorithm(rs.Algorithm)),
+		Digest:    rs.Digest,
+		Signature: rs.Signature,
 	}
 }
 

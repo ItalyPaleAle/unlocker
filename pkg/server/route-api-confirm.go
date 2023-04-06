@@ -119,17 +119,17 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestSta
 	)
 	switch state.Operation {
 	case OperationEncrypt:
-		err = errors.New("unimplemented")
+		output, err = akv.Encrypt(c.Request.Context(), state.Vault, state.KeyId, state.KeyVersion, state.AzkeysKeyOperationsParams())
 	case OperationDecrypt:
-		err = errors.New("unimplemented")
+		output, err = akv.Decrypt(c.Request.Context(), state.Vault, state.KeyId, state.KeyVersion, state.AzkeysKeyOperationsParams())
 	case OperationSign:
-		err = errors.New("unimplemented")
+		output, err = akv.Sign(c.Request.Context(), state.Vault, state.KeyId, state.KeyVersion, state.AzkeysSignParams())
 	case OperationVerify:
-		err = errors.New("unimplemented")
+		output, err = akv.Verify(c.Request.Context(), state.Vault, state.KeyId, state.KeyVersion, state.AzkeysVerifyParams())
 	case OperationWrapKey:
-		output, err = akv.WrapKey(c.Request.Context(), state.Vault, state.KeyId, state.KeyVersion, state.AzkeysOperationParams())
+		output, err = akv.WrapKey(c.Request.Context(), state.Vault, state.KeyId, state.KeyVersion, state.AzkeysKeyOperationsParams())
 	case OperationUnwrapKey:
-		output, err = akv.UnwrapKey(c.Request.Context(), state.Vault, state.KeyId, state.KeyVersion, state.AzkeysOperationParams())
+		output, err = akv.UnwrapKey(c.Request.Context(), state.Vault, state.KeyId, state.KeyVersion, state.AzkeysKeyOperationsParams())
 	default:
 		err = fmt.Errorf("invalid operation %s", state.Operation)
 	}
@@ -162,8 +162,8 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestSta
 	}
 
 	// Store the result and mark as complete
-	state.Output = output
-	state.Input = nil
+	state.Result = output
+	state.Value = nil
 	state.Status = StatusComplete
 
 	// Response
@@ -198,7 +198,7 @@ func (s *Server) cancelRequest(stateId string, state *requestState) {
 	defer s.lock.Unlock()
 
 	// Mark the request as canceled and remove the input
-	state.Input = nil
+	state.Value = nil
 	state.Status = StatusCanceled
 
 	// Send a notification to the subscriber if any

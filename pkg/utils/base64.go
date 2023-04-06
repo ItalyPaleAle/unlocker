@@ -8,6 +8,10 @@ import (
 
 // DecodeBase64String is a flexible base64 decoder that supports both standard and url encodings, and considers padding optional
 func DecodeBase64String(in string) (out []byte, err error) {
+	if in == "" {
+		return nil, nil
+	}
+
 	// First, remove padding if any
 	in = strings.TrimRight(in, "=")
 

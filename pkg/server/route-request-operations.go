@@ -37,7 +37,7 @@ func (s *Server) RouteRequestOperations(op requestOperation) gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Invalid request body"))
 			return
 		}
-		err = req.Parse()
+		err = req.Parse(op)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Invalid request: "+err.Error()))
 			return
@@ -101,14 +101,22 @@ type subtleRequest struct {
 
 	Algorithm      string `json:"algorithm" form:"algorithm"`
 	Value          string `json:"value" form:"value"`
+	Digest         string `json:"digest" form:"digest"`
+	Signature      string `json:"signature" form:"digest"`
 	AdditionalData string `json:"additionalData" form:"additionalData"`
+	Nonce          string `json:"nonce" form:"nonce"`
+	Tag            string `json:"tag" form:"tag"`
 
 	Timeout any    `json:"timeout" form:"timeout"`
 	Note    string `json:"note" form:"note"`
 
 	timeoutDuration     time.Duration
 	valueBytes          []byte
+	digestBytes         []byte
+	signatureBytes      []byte
 	additionalDataBytes []byte
+	nonceBytes          []byte
+	tagBytes            []byte
 }
 
 var (
@@ -117,15 +125,12 @@ var (
 )
 
 // Parse and validate the request object
-func (req *subtleRequest) Parse() (err error) {
+func (req *subtleRequest) Parse(op requestOperation) (err error) {
 	if req.Vault == "" {
 		return errors.New("missing parameter 'vault'")
 	}
 	if req.KeyId == "" {
 		return errors.New("missing parameter 'keyId'")
-	}
-	if req.Value == "" {
-		return errors.New("missing parameter 'value'")
 	}
 	if req.Note != "" && noteValidate.MatchString(req.Note) {
 		return errors.New("parameter 'note' contains invalid characters (only `A-Za-z0-9 ._\\/-` are allowed)")
@@ -139,6 +144,61 @@ func (req *subtleRequest) Parse() (err error) {
 	req.Algorithm = strings.ToUpper(req.Algorithm)
 	if !keyvault.IsAlgorithmSupported(req.Algorithm) {
 		return errors.New("invalid parameter 'algorithm'")
+	}
+
+	// Parse other values specific to the operation
+	switch op {
+	case OperationEncrypt, OperationDecrypt, OperationWrapKey, OperationUnwrapKey:
+		if req.Value == "" {
+			return errors.New("missing parameter 'value'")
+		}
+
+		// Decode the binary values
+		req.valueBytes, err = utils.DecodeBase64String(req.Value)
+		if err != nil {
+			return errors.New("invalid 'value' format")
+		}
+		req.additionalDataBytes, err = utils.DecodeBase64String(req.AdditionalData)
+		if err != nil {
+			return errors.New("invalid 'additionalData' format")
+		}
+		req.nonceBytes, err = utils.DecodeBase64String(req.Nonce)
+		if err != nil {
+			return errors.New("invalid 'nonce' format")
+		}
+		req.tagBytes, err = utils.DecodeBase64String(req.Tag)
+		if err != nil {
+			return errors.New("invalid 'tag' format")
+		}
+
+	case OperationSign:
+		if req.Digest == "" {
+			return errors.New("missing parameter 'digest'")
+		}
+
+		// Decode the binary values
+		req.digestBytes, err = utils.DecodeBase64String(req.Digest)
+		if err != nil {
+			return errors.New("invalid 'digest' format")
+		}
+
+	case OperationVerify:
+		if req.Digest == "" {
+			return errors.New("missing parameter 'digest'")
+		}
+		if req.Signature == "" {
+			return errors.New("missing parameter 'signature'")
+		}
+
+		// Decode the binary values
+		req.digestBytes, err = utils.DecodeBase64String(req.Digest)
+		if err != nil {
+			return errors.New("invalid 'digest' format")
+		}
+		req.signatureBytes, err = utils.DecodeBase64String(req.Signature)
+		if err != nil {
+			return errors.New("invalid 'signature' format")
+		}
 	}
 
 	// Parse timeout
@@ -169,16 +229,6 @@ func (req *subtleRequest) Parse() (err error) {
 		req.KeyVersion = ""
 	}
 
-	// Decode the binary values
-	req.valueBytes, err = utils.DecodeBase64String(req.Value)
-	if err != nil {
-		return errors.New("invalid 'value' format")
-	}
-	req.additionalDataBytes, err = utils.DecodeBase64String(req.AdditionalData)
-	if err != nil {
-		return errors.New("invalid 'additionalData' format")
-	}
-
 	return nil
 }
 
@@ -193,8 +243,12 @@ func (req *subtleRequest) GetRequestState(op requestOperation, requestor string)
 		KeyVersion: req.KeyVersion,
 
 		Algorithm:      req.Algorithm,
-		Input:          req.valueBytes,
+		Value:          req.valueBytes,
+		Digest:         req.digestBytes,
+		Signature:      req.signatureBytes,
 		AdditionalData: req.additionalDataBytes,
+		Nonce:          req.nonceBytes,
+		Tag:            req.tagBytes,
 
 		Requestor: requestor,
 		Date:      now,
