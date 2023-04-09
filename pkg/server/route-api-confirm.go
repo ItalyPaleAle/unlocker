@@ -78,6 +78,7 @@ func (s *Server) RouteApiConfirmPost(c *gin.Context) {
 
 // Handle confirmation of operations
 func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestState) {
+	ctx := c.Request.Context()
 	defer func() {
 		// Record the result in a deferred function to automatically catch failures
 		if len(c.Errors) > 0 {
@@ -119,17 +120,17 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestSta
 	)
 	switch state.Operation {
 	case OperationEncrypt:
-		output, err = akv.Encrypt(c.Request.Context(), state.Vault, state.KeyId, state.KeyVersion, state.AzkeysKeyOperationsParams())
+		output, err = akv.Encrypt(ctx, state.Vault, state.KeyId, state.KeyVersion, state.AzkeysKeyOperationsParams())
 	case OperationDecrypt:
-		output, err = akv.Decrypt(c.Request.Context(), state.Vault, state.KeyId, state.KeyVersion, state.AzkeysKeyOperationsParams())
+		output, err = akv.Decrypt(ctx, state.Vault, state.KeyId, state.KeyVersion, state.AzkeysKeyOperationsParams())
 	case OperationSign:
-		output, err = akv.Sign(c.Request.Context(), state.Vault, state.KeyId, state.KeyVersion, state.AzkeysSignParams())
+		output, err = akv.Sign(ctx, state.Vault, state.KeyId, state.KeyVersion, state.AzkeysSignParams())
 	case OperationVerify:
-		output, err = akv.Verify(c.Request.Context(), state.Vault, state.KeyId, state.KeyVersion, state.AzkeysVerifyParams())
+		output, err = akv.Verify(ctx, state.Vault, state.KeyId, state.KeyVersion, state.AzkeysVerifyParams())
 	case OperationWrapKey:
-		output, err = akv.WrapKey(c.Request.Context(), state.Vault, state.KeyId, state.KeyVersion, state.AzkeysKeyOperationsParams())
+		output, err = akv.WrapKey(ctx, state.Vault, state.KeyId, state.KeyVersion, state.AzkeysKeyOperationsParams())
 	case OperationUnwrapKey:
-		output, err = akv.UnwrapKey(c.Request.Context(), state.Vault, state.KeyId, state.KeyVersion, state.AzkeysKeyOperationsParams())
+		output, err = akv.UnwrapKey(ctx, state.Vault, state.KeyId, state.KeyVersion, state.AzkeysKeyOperationsParams())
 	default:
 		err = fmt.Errorf("invalid operation %s", state.Operation)
 	}
