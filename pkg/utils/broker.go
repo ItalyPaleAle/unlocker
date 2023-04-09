@@ -5,6 +5,8 @@ import (
 	"sync"
 )
 
+var ErrBrokerStopped = errors.New("broker is stopped")
+
 // Broker is a message broker that publishes events to all subscribers
 type Broker[T any] struct {
 	lock        sync.RWMutex
@@ -25,10 +27,10 @@ func (b *Broker[T]) Subscribe() (chan T, error) {
 	defer b.lock.Unlock()
 
 	if b.stopped {
-		return nil, errors.New("broker is stopped")
+		return nil, ErrBrokerStopped
 	}
 
-	ch := make(chan T)
+	ch := make(chan T, 1)
 	b.subscribers[ch] = struct{}{}
 
 	return ch, nil
