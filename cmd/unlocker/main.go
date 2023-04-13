@@ -27,10 +27,8 @@ var appLogger *utils.AppLogger
 
 func main() {
 	// Init the app logger object
-	appLogger = &utils.AppLogger{
-		App: "unlocker",
-	}
-	err := appLogger.InitWithWriter(os.Stderr)
+	var err error
+	appLogger, err = utils.NewAppLogger("unlocker", os.Stderr)
 	if err != nil {
 		panic(err)
 	}

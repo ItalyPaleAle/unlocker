@@ -17,6 +17,18 @@ type AppLogger struct {
 	log zerolog.Logger
 }
 
+// NewAppLogger returns a new AppLogger object
+func NewAppLogger(app string, out io.Writer) (*AppLogger, error) {
+	a := &AppLogger{
+		App: app,
+	}
+	if out == nil {
+		out = gin.DefaultWriter
+	}
+	err := a.InitWithWriter(out)
+	return a, err
+}
+
 // Init the object with the default writer for gin
 func (a *AppLogger) Init() error {
 	return a.InitWithWriter(gin.DefaultWriter)
