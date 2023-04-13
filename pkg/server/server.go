@@ -59,8 +59,7 @@ func (s *Server) Init(log *utils.AppLogger) error {
 	gin.SetMode(gin.ReleaseMode)
 
 	// Init the webhook
-	s.webhook = &utils.Webhook{}
-	s.webhook.Init(log)
+	s.webhook = utils.NewWebhook(log)
 
 	// Init a HTTP client
 	s.httpClient = &http.Client{

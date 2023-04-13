@@ -14,11 +14,11 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	nanoid "github.com/matoous/go-nanoid/v2"
 	"github.com/spf13/viper"
 	"golang.org/x/text/unicode/norm"
 
 	"github.com/italypaleale/unlocker/pkg/config"
-	"github.com/italypaleale/unlocker/pkg/utils"
 )
 
 const (
@@ -50,7 +50,7 @@ func (s *Server) RouteAuthSignin(c *gin.Context) {
 	seed, ttl, err := getSecureCookie(c, authStateCookieName)
 	if err != nil || seed == "" || ttl < (authStateCookieMaxAge-time.Minute) {
 		// Generate a random seed
-		seed, err = utils.RandomString()
+		seed, err = nanoid.New(21)
 		if err != nil {
 			_ = c.Error(fmt.Errorf("failed to generate random seed: %w", err))
 			c.JSON(http.StatusInternalServerError, InternalServerError)

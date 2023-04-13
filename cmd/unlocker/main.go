@@ -14,6 +14,7 @@ import (
 	"syscall"
 
 	"github.com/lestrrat-go/jwx/v2/jwk"
+	nanoid "github.com/matoous/go-nanoid/v2"
 	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
 
@@ -140,6 +141,9 @@ func loadConfig() {
 			Msg("Invalid configuration")
 	}
 
+	// Lowercase the webhook format
+	viper.Set(config.KeyWebhookFormat, strings.ToLower(viper.GetString(config.KeyWebhookFormat)))
+
 	// Check for invalid values
 	if v := viper.GetInt(config.KeySessionTimeout); v < 1 || v > 3600 {
 		appLogger.Raw().Fatal().
@@ -157,7 +161,7 @@ func loadConfig() {
 	if tokenSigningKey == "" {
 		appLogger.Raw().Debug().Msg("No 'tokenSigningKey' found in the configuration: a random one will be generated")
 
-		tokenSigningKey, err = utils.RandomString()
+		tokenSigningKey, err = nanoid.New(21)
 		if err != nil {
 			appLogger.Raw().Fatal().
 				AnErr("error", err).

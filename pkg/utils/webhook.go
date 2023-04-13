@@ -16,12 +16,19 @@ import (
 	"github.com/italypaleale/unlocker/pkg/config"
 )
 
-const timeout = 20 * time.Second
+const webhookTimeout = 20 * time.Second
 
 // Webhook client
 type Webhook struct {
 	httpClient *http.Client
 	log        *AppLogger
+}
+
+// NewWebhook creates a new Webhook
+func NewWebhook(log *AppLogger) *Webhook {
+	w := &Webhook{}
+	w.Init(log)
+	return w
 }
 
 // Init the object
@@ -30,7 +37,7 @@ func (w *Webhook) Init(log *AppLogger) {
 
 	// Init a HTTP client
 	w.httpClient = &http.Client{
-		Timeout: timeout,
+		Timeout: webhookTimeout,
 	}
 }
 
@@ -42,8 +49,8 @@ func (w *Webhook) SendWebhook(ctx context.Context, data *WebhookRequest) (err er
 	const attempts = 3
 	for i := 0; i < attempts; i++ {
 		var req *http.Request
-		reqCtx, reqCancel := context.WithTimeout(ctx, timeout)
-		switch strings.ToLower(viper.GetString(config.KeyWebhookFormat)) {
+		reqCtx, reqCancel := context.WithTimeout(ctx, webhookTimeout)
+		switch viper.GetString(config.KeyWebhookFormat) {
 		case "slack":
 			req, err = w.prepareSlackRequest(reqCtx, webhookUrl, data)
 		case "discord":
@@ -76,7 +83,7 @@ func (w *Webhook) SendWebhook(ctx context.Context, data *WebhookRequest) (err er
 		_, _ = io.Copy(io.Discard, res.Body)
 		res.Body.Close()
 
-		// Handle throttling
+		// Handle throttling on 429 responses and on 5xx errors
 		if res.StatusCode == http.StatusTooManyRequests {
 			retryAfter, _ := strconv.Atoi(res.Header.Get("Retry-After"))
 			if retryAfter < 1 || retryAfter > 30 {
@@ -85,6 +92,14 @@ func (w *Webhook) SendWebhook(ctx context.Context, data *WebhookRequest) (err er
 			w.log.Raw().Warn().
 				Msgf("Webhook throttled; will retry after %d seconds", retryAfter)
 			time.Sleep(time.Duration(retryAfter) * time.Second)
+			continue
+		}
+
+		// Retry after a delay on 5xx errors, which indicate a problem with the server
+		if res.StatusCode >= 500 && res.StatusCode < 600 {
+			w.log.Raw().Warn().
+				Msgf("Webhook returned an error response: %d; will retry after 30 seconds", res.StatusCode)
+			time.Sleep(30 * time.Second)
 			continue
 		}
 
@@ -105,7 +120,11 @@ func (w *Webhook) getLink(data *WebhookRequest) string {
 func (w *Webhook) preparePlainRequest(ctx context.Context, webhookUrl string, data *WebhookRequest) (req *http.Request, err error) {
 	// Format the message
 	message := fmt.Sprintf(
-		"Received a request to %s a key using key **%s** in vault **%s**.\n\n[Confirm request](%s)\n\n(Request ID: %s - Client IP: %s)",
+		`Received a request to %s a key using key **%s** in vault **%s**.
+
+Confirm request: %s
+
+(Request ID: %s - Client IP: %s)`,
 		data.OperationName,
 		data.KeyId,
 		data.Vault,
@@ -115,7 +134,7 @@ func (w *Webhook) preparePlainRequest(ctx context.Context, webhookUrl string, da
 	)
 
 	// Create the request
-	req, err = http.NewRequestWithContext(ctx, "POST", webhookUrl, strings.NewReader(message))
+	req, err = http.NewRequestWithContext(ctx, http.MethodPost, webhookUrl, strings.NewReader(message))
 	if err != nil {
 		return nil, err
 	}
@@ -158,7 +177,7 @@ func (w *Webhook) prepareSlackRequest(ctx context.Context, webhookUrl string, da
 	}
 
 	// Create the request
-	req, err = http.NewRequestWithContext(ctx, "POST", webhookUrl, buf)
+	req, err = http.NewRequestWithContext(ctx, http.MethodPost, webhookUrl, buf)
 	if err != nil {
 		return nil, err
 	}
