@@ -78,10 +78,12 @@ func (w *Webhook) SendWebhook(ctx context.Context, data *WebhookRequest) (err er
 		}
 		if err != nil {
 			reqCancel()
-			return err
+			// This is a permanent error
+			return fmt.Errorf("failed to create request: %w", err)
 		}
 
-		res, err := w.httpClient.Do(req)
+		var res *http.Response
+		res, err = w.httpClient.Do(req)
 		reqCancel()
 		if err != nil {
 			// Retry after 15 seconds on network failures, if we have more attempts
@@ -93,13 +95,14 @@ func (w *Webhook) SendWebhook(ctx context.Context, data *WebhookRequest) (err er
 				case <-w.clock.After(15 * time.Second):
 					// Nop
 				case <-ctx.Done():
-					return ctx.Err()
+					err = ctx.Err()
+					break
 				}
 				continue
 			}
 
-			// If we've exhausted the available attempts, return right away
-			return err
+			// If we've exhausted the available attempts, break out of the loop right away
+			break
 		}
 
 		// Drain body before closing
@@ -120,7 +123,8 @@ func (w *Webhook) SendWebhook(ctx context.Context, data *WebhookRequest) (err er
 				case <-w.clock.After(time.Duration(retryAfter) * time.Second):
 					// Nop
 				case <-ctx.Done():
-					return ctx.Err()
+					err = ctx.Err()
+					break
 				}
 				continue
 			}
@@ -133,7 +137,8 @@ func (w *Webhook) SendWebhook(ctx context.Context, data *WebhookRequest) (err er
 				case <-w.clock.After(30 * time.Second):
 					// Nop
 				case <-ctx.Done():
-					return ctx.Err()
+					err = ctx.Err()
+					break
 				}
 				continue
 			}
@@ -141,12 +146,18 @@ func (w *Webhook) SendWebhook(ctx context.Context, data *WebhookRequest) (err er
 
 		// Any other error is permanent
 		if res.StatusCode < 200 || res.StatusCode > 299 {
-			return fmt.Errorf("invalid response status code: %d", res.StatusCode)
+			err = fmt.Errorf("invalid response status code: %d", res.StatusCode)
+			break
 		}
-		return nil
+
+		// If we're here, everything is good
+		break
 	}
 
-	return fmt.Errorf("failed to send webhook after %d attempts", attempts)
+	if err != nil {
+		err = fmt.Errorf("failed to send webhook after %d attempts; last error: %w", attempts, err)
+	}
+	return err
 }
 
 func (w *Webhook) getLink(data *WebhookRequest) string {

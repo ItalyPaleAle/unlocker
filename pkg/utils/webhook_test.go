@@ -102,6 +102,21 @@ func TestWebhook(t *testing.T) {
 		requireBodyEqual(t, r.Body, `{"text":"Received a request to wrap a key using key **mykey** in vault **myvault**.\n[Confirm request](http://test.local/app)\n`+"`(Request ID: mystate - Client IP: 127.0.0.1)`"+`"}`+"\n")
 	}))
 
+	t.Run("plain request with authorization", basicTestFn(map[string]any{
+		config.KeyWebhookKey: "mykey",
+	}, func(t *testing.T, r *http.Request) {
+		require.Equal(t, "http://test.local/endpoint", r.URL.String())
+		require.Equal(t, "mykey", r.Header.Get("authorization"))
+	}))
+
+	t.Run("slack request with authorization", basicTestFn(map[string]any{
+		config.KeyWebhookKey:    "mykey",
+		config.KeyWebhookFormat: "slack",
+	}, func(t *testing.T, r *http.Request) {
+		require.Equal(t, "http://test.local/endpoint", r.URL.String())
+		require.Equal(t, "mykey", r.Header.Get("authorization"))
+	}))
+
 	t.Run("fail on 4xx status codes", func(t *testing.T) {
 		reqCh := make(chan *http.Request, 1)
 		rt.reqCh = reqCh
@@ -126,12 +141,8 @@ func TestWebhook(t *testing.T) {
 		rt.reqCh = reqCh
 		rt.responses = make(chan *http.Response, 2)
 		// Send a 429 status code twice
-		rt.responses <- &http.Response{
-			StatusCode: http.StatusTooManyRequests,
-		}
-		rt.responses <- &http.Response{
-			StatusCode: http.StatusTooManyRequests,
-		}
+		rt.responses <- &http.Response{StatusCode: http.StatusTooManyRequests}
+		rt.responses <- &http.Response{StatusCode: http.StatusTooManyRequests}
 		defer func() {
 			rt.responses = nil
 		}()
@@ -175,6 +186,85 @@ func TestWebhook(t *testing.T) {
 
 		// This will receive an error after 3 requests have come in, or the context timed out
 		assert.NoError(t, <-doneCh)
+	})
+
+	t.Run("retry on 5xx status codes", func(t *testing.T) {
+		reqCh := make(chan *http.Request)
+		rt.reqCh = reqCh
+		rt.responses = make(chan *http.Response, 1)
+		// Send a 500 status code once
+		rt.responses <- &http.Response{StatusCode: http.StatusInternalServerError}
+		defer func() {
+			rt.responses = nil
+		}()
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		doneCh := assertRetries(ctx, clock, reqCh, 2, 30*time.Second)
+
+		err = wh.SendWebhook(ctx, getWebhookRequest())
+		assert.NoError(t, err)
+
+		// This will receive an error after 3 requests have come in, or the context timed out
+		assert.NoError(t, <-doneCh)
+	})
+
+	t.Run("too many failed attempts with 429 status codes", func(t *testing.T) {
+		reqCh := make(chan *http.Request)
+		rt.reqCh = reqCh
+		rt.responses = make(chan *http.Response, 3)
+		// Send a 429 status code 3 times
+		rt.responses <- &http.Response{StatusCode: http.StatusTooManyRequests}
+		rt.responses <- &http.Response{StatusCode: http.StatusTooManyRequests}
+		rt.responses <- &http.Response{StatusCode: http.StatusTooManyRequests}
+		defer func() {
+			rt.responses = nil
+		}()
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		doneCh := assertRetries(ctx, clock, reqCh, 3, 30*time.Second)
+
+		err = wh.SendWebhook(ctx, getWebhookRequest())
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "invalid response status code: 429")
+
+		// This will receive an error after 3 requests have come in, or the context timed out
+		assert.NoError(t, <-doneCh)
+	})
+
+	t.Run("too many failed attempts with 5xx status codes", func(t *testing.T) {
+		reqCh := make(chan *http.Request)
+		rt.reqCh = reqCh
+		rt.responses = make(chan *http.Response, 3)
+		// Send a 429 status code 3 times
+		rt.responses <- &http.Response{StatusCode: http.StatusInternalServerError}
+		rt.responses <- &http.Response{StatusCode: http.StatusBadGateway}
+		rt.responses <- &http.Response{StatusCode: http.StatusBadGateway}
+		defer func() {
+			rt.responses = nil
+		}()
+
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		doneCh := assertRetries(ctx, clock, reqCh, 3, 30*time.Second)
+
+		err = wh.SendWebhook(ctx, getWebhookRequest())
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "invalid response status code: 502")
+
+		// This will receive an error after 3 requests have come in, or the context timed out
+		assert.NoError(t, <-doneCh)
+	})
+
+	t.Run("webhookUrl is invalid", func(t *testing.T) {
+		defer setTestConfigs(map[string]any{
+			config.KeyWebhookUrl: "\nnotanurl",
+		})()
+
+		err := wh.SendWebhook(context.Background(), getWebhookRequest())
+		assert.Error(t, err)
+		assert.ErrorContains(t, err, "failed to create request")
 	})
 }
 
