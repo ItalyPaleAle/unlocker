@@ -10,6 +10,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	nanoid "github.com/matoous/go-nanoid/v2"
@@ -21,12 +22,9 @@ import (
 
 func loadConfig() error {
 	// Defaults
-	viper.SetDefault(config.KeyLogLevel, "info")
-	viper.SetDefault(config.KeyPort, 8080)
-	viper.SetDefault(config.KeyBind, "0.0.0.0")
-	viper.SetDefault(config.KeyBaseUrl, "https://localhost:8080")
-	viper.SetDefault(config.KeySessionTimeout, 300)
-	viper.SetDefault(config.KeyRequestTimeout, 300)
+	for k, v := range getDefaultConfig() {
+		viper.SetDefault(k, v)
+	}
 
 	// Env
 	viper.SetEnvPrefix("UNLOCKER")
@@ -58,22 +56,49 @@ func loadConfig() error {
 	return processConfig()
 }
 
+// Gets the default config
+func getDefaultConfig() map[string]any {
+	return map[string]any{
+		config.KeyLogLevel:       "info",
+		config.KeyPort:           8080,
+		config.KeyBind:           "0.0.0.0",
+		config.KeyBaseUrl:        "https://localhost:8080",
+		config.KeySessionTimeout: 5 * time.Minute,
+		config.KeyRequestTimeout: 5 * time.Minute,
+	}
+}
+
 // Processes the configuration from viper
 func processConfig() (err error) {
 	// Log level
-	switch strings.ToLower(viper.GetString(config.KeyLogLevel)) {
-	case "debug":
-		appLogger.SetLogLevel(zerolog.DebugLevel)
-	case "", "info": // Also default log level
-		appLogger.SetLogLevel(zerolog.InfoLevel)
-	case "warn":
-		appLogger.SetLogLevel(zerolog.WarnLevel)
-	case "error":
-		appLogger.SetLogLevel(zerolog.ErrorLevel)
-	default:
-		return newLoadConfigError("Invalid value for 'logLevel'", "Invalid configuration")
+	err = setLogLevel()
+	if err != nil {
+		return err
 	}
 
+	// Check required variables
+	err = validateConfig()
+	if err != nil {
+		return err
+	}
+
+	// Ensures the token signing key is present
+	err = ensureTokenSigningKey()
+	if err != nil {
+		return err
+	}
+
+	// Set the cookie keys
+	err = setCookieKeys()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Validates the configuration and performs some sanitization
+func validateConfig() error {
 	// Check required variables
 	if viper.GetString(config.KeyAzureClientId) == "" {
 		return newLoadConfigError("Config entry key 'azureClientId' missing", "Invalid configuration")
@@ -86,17 +111,38 @@ func processConfig() (err error) {
 	}
 
 	// Check for invalid values
-	if v := viper.GetInt(config.KeySessionTimeout); v < 1 || v > 3600 {
-		return newLoadConfigError("Config entry key 'sessionTimeout' is invalid: must be between 1 and 3600", "Invalid configuration")
+	if v := viper.GetDuration(config.KeySessionTimeout); v < time.Second || v > time.Hour {
+		return newLoadConfigError("Config entry key 'sessionTimeout' is invalid: must be between 1s and 1h", "Invalid configuration")
 	}
-	if v := viper.GetInt(config.KeyRequestTimeout); v < 1 {
-		return newLoadConfigError("Config entry key 'requestTimeout' is invalid: must be greater than 1", "Invalid configuration")
+	if v := viper.GetDuration(config.KeyRequestTimeout); v < time.Second {
+		return newLoadConfigError("Config entry key 'requestTimeout' is invalid: must be greater than 1s", "Invalid configuration")
 	}
 
 	// Lowercase the webhook format
 	viper.Set(config.KeyWebhookFormat, strings.ToLower(viper.GetString(config.KeyWebhookFormat)))
 
-	// Generate random tokenSigningKey if needed
+	return nil
+}
+
+// Sets the log level based on the configuration
+func setLogLevel() error {
+	switch strings.ToLower(viper.GetString(config.KeyLogLevel)) {
+	case "debug":
+		appLogger.SetLogLevel(zerolog.DebugLevel)
+	case "", "info": // Also default log level
+		appLogger.SetLogLevel(zerolog.InfoLevel)
+	case "warn":
+		appLogger.SetLogLevel(zerolog.WarnLevel)
+	case "error":
+		appLogger.SetLogLevel(zerolog.ErrorLevel)
+	default:
+		return newLoadConfigError("Invalid value for 'logLevel'", "Invalid configuration")
+	}
+	return nil
+}
+
+// Ensures the token signing key is present
+func ensureTokenSigningKey() (err error) {
 	tokenSigningKey := viper.GetString(config.KeyTokenSigningKey)
 	if tokenSigningKey == "" {
 		appLogger.Raw().Debug().Msg("No 'tokenSigningKey' found in the configuration: a random one will be generated")
@@ -107,12 +153,6 @@ func processConfig() (err error) {
 		}
 	}
 	viper.Set(config.KeyInternalTokenSigningKey, tokenSigningKey)
-
-	// Set the cookie keys
-	err = setCookieKeys()
-	if err != nil {
-		return err
-	}
 
 	return nil
 }
@@ -194,7 +234,7 @@ func newLoadConfigError(err any, msg string) *loadConfigError {
 
 // Error implements the error interface
 func (e loadConfigError) Error() string {
-	return e.msg
+	return e.err + ": " + e.msg
 }
 
 // LogFatal causes a fatal log

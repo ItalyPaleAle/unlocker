@@ -206,9 +206,8 @@ func (req *subtleRequest) Parse(op requestOperation) (err error) {
 	// Otherwise, parse it as a Go duration
 	timeoutStr := cast.ToString(req.Timeout)
 	if timeoutStr == "" {
-		timeoutStr = viper.GetString(config.KeyRequestTimeout)
-	}
-	if durationNumber.MatchString(timeoutStr) {
+		req.timeoutDuration = viper.GetDuration(config.KeyRequestTimeout)
+	} else if durationNumber.MatchString(timeoutStr) {
 		timeout, _ := strconv.Atoi(timeoutStr)
 		if timeout > 0 {
 			req.timeoutDuration = time.Duration(timeout) * time.Second

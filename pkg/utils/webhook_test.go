@@ -9,17 +9,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	clocktesting "k8s.io/utils/clock/testing"
 
 	"github.com/italypaleale/unlocker/pkg/config"
+	"github.com/italypaleale/unlocker/pkg/testutils"
 )
 
 func TestWebhook(t *testing.T) {
 	// Set configurations
-	defer setTestConfigs(map[string]any{
+	defer testutils.SetTestConfigs(map[string]any{
 		config.KeyWebhookUrl:    "http://test.local/endpoint",
 		config.KeyBaseUrl:       "http://test.local/app",
 		config.KeyWebhookKey:    "",
@@ -49,7 +49,7 @@ func TestWebhook(t *testing.T) {
 	basicTestFn := func(configs map[string]any, assertFn func(t *testing.T, r *http.Request)) func(*testing.T) {
 		return func(t *testing.T) {
 			if len(configs) > 0 {
-				defer setTestConfigs(configs)()
+				defer testutils.SetTestConfigs(configs)()
 			}
 
 			reqCh := make(chan *http.Request, 1)
@@ -258,7 +258,7 @@ func TestWebhook(t *testing.T) {
 	})
 
 	t.Run("webhookUrl is invalid", func(t *testing.T) {
-		defer setTestConfigs(map[string]any{
+		defer testutils.SetTestConfigs(map[string]any{
 			config.KeyWebhookUrl: "\nnotanurl",
 		})()
 
@@ -300,22 +300,6 @@ func requireBodyEqual(t *testing.T, body io.ReadCloser, expect string) {
 	require.NoError(t, err, "failed to read body")
 
 	require.Equal(t, expect, string(read))
-}
-
-// Updates the configuration in the viper global object for the test
-// Returns a function that should be called with "defer" to restore the previous configuration
-func setTestConfigs(values map[string]any) func() {
-	prevConfig := make(map[string]any, len(values))
-	for k, v := range values {
-		prevConfig[k] = viper.Get(k)
-		viper.Set(k, v)
-	}
-
-	return func() {
-		for k, v := range prevConfig {
-			viper.Set(k, v)
-		}
-	}
 }
 
 // Asserts that the code retries the desired number of times

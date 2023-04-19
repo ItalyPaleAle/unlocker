@@ -48,14 +48,14 @@ origins: ""
 # Default: "https://localhost:8080"
 baseUrl: "https://localhost:8080"
 
-# Timeout for sessions before having to authenticate again, in seconds. This cannot be more than 3600 (1 hour).
-# Default 300 (5 minutes)
-sessionTimeout: 300
+# Timeout for sessions before having to authenticate again. This cannot be more than 1 hour.
+# Default: "5m"
+sessionTimeout: "5m"
 
-# Default timeout for wrap and unwrap requests, in seconds
-# Default 300 (5 minutes)
+# Default timeout for wrap and unwrap requests.
+# Default "5m"
 # Can be overridden in each request
-requestTimeout: 300
+requestTimeout: "5m"
 
 # Enable the metrics server which exposes a Prometheus-compatible endpoint `/metrics`
 # Default: false

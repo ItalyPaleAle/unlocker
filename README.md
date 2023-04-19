@@ -89,11 +89,11 @@ All configuration options:
 - **`origins`** (optional, default is equal to the value of `baseUrl`):  
   Comma-separated lists of origins that are allowed for CORS. This should be a list of all URLs admins can access Unlocker at. Alternatively, set this to `*` to allow any origin (not recommended).  
   Environmental variable name: `UNLOCKER_ORIGINS`
-- **`sessionTimeout`** (optional, default: `300`, i.e. 5 minutes):  
-  Timeout for sessions before having to authenticate again, in seconds. This cannot be more than 3600 (1 hour).  
+- **`sessionTimeout`** (optional, default: `5m`)  
+  Timeout for sessions before having to authenticate again, as a Go duration. This cannot be more than 1 hour.  
   Environmental variable name: `UNLOCKER_SESSIONTIMEOUT`
-- **`requestTimeout`** (optional, default: `300`, i.e. 5 minutes):  
-  Default timeout for wrap and unwrap requests, in seconds. This is the default value, and can be overridden in each request.  
+- **`requestTimeout`** (optional, default: `5m`):  
+  Default timeout for wrap and unwrap requests, as a Go duration. This is the default value, and can be overridden in each request.  
   Environmental variable name: `UNLOCKER_REQUESTTIMEOUT`
 - **`enableMetrics`** (optional, default: `false`):
   Enable the metrics server which exposes a Prometheus-compatible endpoint `/metrics`.
