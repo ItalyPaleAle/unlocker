@@ -2,9 +2,11 @@ package main
 
 import (
 	"bytes"
+	"encoding/base64"
 	"testing"
 	"time"
 
+	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 
@@ -94,6 +96,8 @@ func TestEnsureTokenSigningKey(t *testing.T) {
 	t.Run("tokenSigningKey present", func(t *testing.T) {
 		defer utils.SetTestConfigs(map[string]any{
 			config.KeyTokenSigningKey: "hello-world",
+			// This will allow resetting it at the end of the test
+			config.KeyInternalTokenSigningKey: "",
 		})()
 
 		err := ensureTokenSigningKey()
@@ -104,6 +108,8 @@ func TestEnsureTokenSigningKey(t *testing.T) {
 	t.Run("tokenSigningKey not present", func(t *testing.T) {
 		defer utils.SetTestConfigs(map[string]any{
 			config.KeyTokenSigningKey: "",
+			// This will allow resetting it at the end of the test
+			config.KeyInternalTokenSigningKey: "",
 		})()
 
 		err := ensureTokenSigningKey()
@@ -112,5 +118,78 @@ func TestEnsureTokenSigningKey(t *testing.T) {
 
 		logsMsg := logs.String()
 		require.Contains(t, logsMsg, "No 'tokenSigningKey' found in the configuration")
+	})
+}
+
+func TestSetCookieKeys(t *testing.T) {
+	logs := &bytes.Buffer{}
+	utils.SetAppLogger(&appLogger, logs)
+
+	t.Run("cookieEncryptionKey present", func(t *testing.T) {
+		defer utils.SetTestConfigs(map[string]any{
+			config.KeyCookieEncryptionKey: "some-key",
+			// This will allow resetting the values at the end of the test
+			config.KeyInternalCookieEncryptionKey: "",
+			config.KeyInternalCookieSigningKey:    "",
+		})()
+
+		err := setCookieKeys()
+		require.NoError(t, err)
+
+		cekAny := viper.Get(config.KeyInternalCookieEncryptionKey)
+		cskAny := viper.Get(config.KeyInternalCookieSigningKey)
+		require.NotNil(t, cekAny)
+		require.NotNil(t, cskAny)
+
+		cek, ok := cekAny.(jwk.Key)
+		require.True(t, ok)
+		csk, ok := cskAny.(jwk.Key)
+		require.True(t, ok)
+
+		var cekRaw, cskRaw []byte
+		err = cek.Raw(&cekRaw)
+		require.NoError(t, err)
+		err = csk.Raw(&cskRaw)
+		require.NoError(t, err)
+
+		require.Equal(t, "G3IonJt59Sym1DI63hdLcg", base64.RawStdEncoding.EncodeToString(cekRaw))
+		require.Equal(t, "8TXMP0eG09zvB9gQQIBQNcdzHCC2z5dZgnnLY+uewdk", base64.RawStdEncoding.EncodeToString(cskRaw))
+
+		require.Equal(t, "BJAimQR5siBAh8_6", cek.KeyID())
+		require.Equal(t, "BJAimQR5siBAh8_6", csk.KeyID())
+	})
+
+	t.Run("cookieEncryptionKey no present", func(t *testing.T) {
+		defer utils.SetTestConfigs(map[string]any{
+			config.KeyCookieEncryptionKey: "",
+			// This will allow resetting the values at the end of the test
+			config.KeyInternalCookieEncryptionKey: "",
+			config.KeyInternalCookieSigningKey:    "",
+		})()
+
+		err := setCookieKeys()
+		require.NoError(t, err)
+
+		cekAny := viper.Get(config.KeyInternalCookieEncryptionKey)
+		cskAny := viper.Get(config.KeyInternalCookieSigningKey)
+		require.NotNil(t, cekAny)
+		require.NotNil(t, cskAny)
+
+		cek, ok := cekAny.(jwk.Key)
+		require.True(t, ok)
+		csk, ok := cskAny.(jwk.Key)
+		require.True(t, ok)
+
+		var cekRaw, cskRaw []byte
+		err = cek.Raw(&cekRaw)
+		require.NoError(t, err)
+		err = csk.Raw(&cskRaw)
+		require.NoError(t, err)
+
+		require.Len(t, cekRaw, 16)
+		require.Len(t, cskRaw, 32)
+
+		require.NotEmpty(t, cek.KeyID())
+		require.NotEmpty(t, csk.KeyID())
 	})
 }
