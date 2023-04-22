@@ -2,9 +2,7 @@ package keyvault
 
 import "github.com/Azure/azure-sdk-for-go/sdk/keyvault/azkeys"
 
-var (
-	supportedAlgorithms map[string]struct{}
-)
+var supportedAlgorithms map[string]struct{}
 
 func init() {
 	enc := azkeys.PossibleJSONWebKeyEncryptionAlgorithmValues()

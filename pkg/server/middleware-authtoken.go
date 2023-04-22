@@ -10,9 +10,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-const headerSessionTTL = "x-session-ttl"
-const contextKeySessionAccessToken = "sessionAccessToken"
-const contextKeySessionExpiration = "sessionExpiration"
+const (
+	headerSessionTTL             = "x-session-ttl"
+	contextKeySessionAccessToken = "sessionAccessToken"
+	contextKeySessionExpiration  = "sessionExpiration"
+)
 
 type AccessTokenMiddlewareOpts struct {
 	// If true, the request fails if the token is not present
@@ -43,7 +45,7 @@ func (s *Server) AccessTokenMiddleware(opts AccessTokenMiddlewareOpts) func(c *g
 		at, ttl, err := getSecureCookie(c, atCookieName)
 		if err != nil || at == "" {
 			if err != nil {
-				_ = c.Error(fmt.Errorf("cookie error: %v", err))
+				_ = c.Error(fmt.Errorf("cookie error: %w", err))
 			}
 			if opts.Required {
 				c.AbortWithStatusJSON(http.StatusUnauthorized, ErrorResponse("User is not authenticated or there's no access token in the cookies"))

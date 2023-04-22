@@ -88,7 +88,7 @@ func (s *Server) routeApiListGetStream(c *gin.Context) {
 	// Subscribe to receive new events
 	events, err := s.pubsub.Subscribe()
 	if err != nil {
-		_ = c.Error(fmt.Errorf("error subscribing to events: %v", err))
+		_ = c.Error(fmt.Errorf("error subscribing to events: %w", err))
 		c.AbortWithStatusJSON(http.StatusInternalServerError, InternalServerError)
 		s.lock.Unlock()
 		return

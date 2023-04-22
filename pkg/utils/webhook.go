@@ -72,7 +72,7 @@ func (w *Webhook) SendWebhook(ctx context.Context, data *WebhookRequest) (err er
 				webhookUrl += "/slack"
 			}
 			req, err = w.prepareSlackRequest(reqCtx, webhookUrl, data)
-		//case "plain":
+		// case "plain":
 		default:
 			req, err = w.preparePlainRequest(reqCtx, webhookUrl, data)
 		}

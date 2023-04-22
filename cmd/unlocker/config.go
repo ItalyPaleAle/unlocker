@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -47,7 +48,8 @@ func loadConfig() error {
 	err := viper.ReadInConfig()
 	if err != nil {
 		// Ignore errors if the config file doesn't exist
-		if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+		var notfoundErr viper.ConfigFileNotFoundError
+		if !errors.As(err, &notfoundErr) {
 			return newLoadConfigError(err, "Error loading config file")
 		}
 	}

@@ -170,8 +170,8 @@ func TestWebhook(t *testing.T) {
 			return res
 		}
 		// Send a 429 status code twice but with a Retry-After header
-		rt.responses <- makeRes()
-		rt.responses <- makeRes()
+		rt.responses <- makeRes() //nolint:bodyclose
+		rt.responses <- makeRes() //nolint:bodyclose
 		defer func() {
 			rt.responses = nil
 		}()

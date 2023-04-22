@@ -87,14 +87,16 @@ func (s *Server) initAppServer() error {
 
 	// CORS configuration
 	corsConfig := cors.Config{
-		AllowMethods: []string{"GET", "POST", "HEAD"},
+		AllowMethods: []string{
+			http.MethodGet,
+			http.MethodPost,
+			http.MethodHead,
+		},
 		AllowHeaders: []string{
 			"Authorization",
 			"Origin",
 			"Content-Length",
 			"Content-Type",
-			"X-System-Creds",
-			"X-System-Code",
 		},
 		ExposeHeaders: []string{
 			"Retry-After",
