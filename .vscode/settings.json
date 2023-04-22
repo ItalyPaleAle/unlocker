@@ -3,4 +3,5 @@
         "source.fixAll": true
     },
     "eslint.validate": ["javascript", "svelte", "typescript"],
+    "go.buildTags": "unit"
 }

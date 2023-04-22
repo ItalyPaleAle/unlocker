@@ -14,12 +14,11 @@ import (
 	clocktesting "k8s.io/utils/clock/testing"
 
 	"github.com/italypaleale/unlocker/pkg/config"
-	"github.com/italypaleale/unlocker/pkg/testutils"
 )
 
 func TestWebhook(t *testing.T) {
 	// Set configurations
-	defer testutils.SetTestConfigs(map[string]any{
+	defer SetTestConfigs(map[string]any{
 		config.KeyWebhookUrl:    "http://test.local/endpoint",
 		config.KeyBaseUrl:       "http://test.local/app",
 		config.KeyWebhookKey:    "",
@@ -49,7 +48,7 @@ func TestWebhook(t *testing.T) {
 	basicTestFn := func(configs map[string]any, assertFn func(t *testing.T, r *http.Request)) func(*testing.T) {
 		return func(t *testing.T) {
 			if len(configs) > 0 {
-				defer testutils.SetTestConfigs(configs)()
+				defer SetTestConfigs(configs)()
 			}
 
 			reqCh := make(chan *http.Request, 1)
@@ -258,7 +257,7 @@ func TestWebhook(t *testing.T) {
 	})
 
 	t.Run("webhookUrl is invalid", func(t *testing.T) {
-		defer testutils.SetTestConfigs(map[string]any{
+		defer SetTestConfigs(map[string]any{
 			config.KeyWebhookUrl: "\nnotanurl",
 		})()
 
