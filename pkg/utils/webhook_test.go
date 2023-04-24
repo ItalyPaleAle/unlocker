@@ -29,7 +29,7 @@ func TestWebhook(t *testing.T) {
 	require.NoError(t, err)
 
 	clock := clocktesting.NewFakeClock(time.Now())
-	wh := newWebhookWithClock(logger, clock)
+	wh := newWebhookWithClock(logger, clock).(*webhookClient)
 
 	// Create a roundtripper that captures the requests
 	rt := &roundTripperTest{}

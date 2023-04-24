@@ -39,8 +39,11 @@ func main() {
 		}
 	}
 
+	// Init the webhook object
+	webhook := utils.NewWebhook(appLogger)
+
 	// Create the Server object
-	srv, err := server.NewServer(appLogger)
+	srv, err := server.NewServer(appLogger, webhook)
 	if err != nil {
 		appLogger.Raw().Fatal().
 			AnErr("error", err).

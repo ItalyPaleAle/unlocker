@@ -33,7 +33,7 @@ type Server struct {
 	log        *utils.AppLogger
 	states     map[string]*requestState
 	lock       sync.RWMutex
-	webhook    *utils.Webhook
+	webhook    utils.Webhook
 	metrics    metrics.UnlockerMetrics
 	// Subscribers that receive public events
 	pubsub *utils.Broker[*requestStatePublic]
@@ -50,12 +50,13 @@ type Server struct {
 }
 
 // NewServer creates a new Server object and initializes it
-func NewServer(log *utils.AppLogger) (*Server, error) {
+func NewServer(log *utils.AppLogger, webhook utils.Webhook) (*Server, error) {
 	s := &Server{
-		log:    log,
-		states: map[string]*requestState{},
-		subs:   map[string]chan *requestState{},
-		pubsub: utils.NewBroker[*requestStatePublic](),
+		log:     log,
+		states:  map[string]*requestState{},
+		subs:    map[string]chan *requestState{},
+		pubsub:  utils.NewBroker[*requestStatePublic](),
+		webhook: webhook,
 
 		httpClient: &http.Client{
 			Timeout: 15 * time.Second,
@@ -73,9 +74,6 @@ func NewServer(log *utils.AppLogger) (*Server, error) {
 
 // Init the Server object and create a Gin server
 func (s *Server) init() error {
-	// Init the webhook
-	s.webhook = utils.NewWebhook(s.log)
-
 	// Init the Prometheus metrics
 	s.metrics.Init()
 

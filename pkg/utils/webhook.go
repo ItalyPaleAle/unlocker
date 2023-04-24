@@ -19,25 +19,27 @@ import (
 
 const webhookTimeout = 20 * time.Second
 
+// Interface for webhook clients
+type Webhook interface {
+	// SendWebhook sends the notification
+	SendWebhook(ctx context.Context, data *WebhookRequest) error
+}
+
 // Webhook client
-type Webhook struct {
+type webhookClient struct {
 	httpClient *http.Client
 	log        *AppLogger
 	clock      kclock.Clock
 }
 
 // NewWebhook creates a new Webhook
-func NewWebhook(log *AppLogger) *Webhook {
-	w := &Webhook{
-		clock: kclock.RealClock{},
-	}
-	w.Init(log)
-	return w
+func NewWebhook(log *AppLogger) Webhook {
+	return newWebhookWithClock(log, kclock.RealClock{})
 }
 
 // newWebhookWithClock creates a new Webhook with the given clock
-func newWebhookWithClock(log *AppLogger, clock kclock.Clock) *Webhook {
-	w := &Webhook{
+func newWebhookWithClock(log *AppLogger, clock kclock.Clock) Webhook {
+	w := &webhookClient{
 		clock: clock,
 	}
 	w.Init(log)
@@ -45,7 +47,7 @@ func newWebhookWithClock(log *AppLogger, clock kclock.Clock) *Webhook {
 }
 
 // Init the object
-func (w *Webhook) Init(log *AppLogger) {
+func (w *webhookClient) Init(log *AppLogger) {
 	w.log = log
 
 	// Init a HTTP client
@@ -55,7 +57,7 @@ func (w *Webhook) Init(log *AppLogger) {
 }
 
 // SendWebhook sends the notification
-func (w *Webhook) SendWebhook(ctx context.Context, data *WebhookRequest) (err error) {
+func (w *webhookClient) SendWebhook(ctx context.Context, data *WebhookRequest) (err error) {
 	webhookUrl := viper.GetString(config.KeyWebhookUrl)
 
 	// Retry up to 3 times
@@ -160,11 +162,11 @@ func (w *Webhook) SendWebhook(ctx context.Context, data *WebhookRequest) (err er
 	return err
 }
 
-func (w *Webhook) getLink(data *WebhookRequest) string {
+func (w *webhookClient) getLink(data *WebhookRequest) string {
 	return viper.GetString(config.KeyBaseUrl)
 }
 
-func (w *Webhook) preparePlainRequest(ctx context.Context, webhookUrl string, data *WebhookRequest) (req *http.Request, err error) {
+func (w *webhookClient) preparePlainRequest(ctx context.Context, webhookUrl string, data *WebhookRequest) (req *http.Request, err error) {
 	// Format the message
 	message := fmt.Sprintf(
 		`Received a request to %s a key using key **%s** in vault **%s**.
@@ -195,7 +197,7 @@ Confirm request: %s
 	return req, nil
 }
 
-func (w *Webhook) prepareSlackRequest(ctx context.Context, webhookUrl string, data *WebhookRequest) (req *http.Request, err error) {
+func (w *webhookClient) prepareSlackRequest(ctx context.Context, webhookUrl string, data *WebhookRequest) (req *http.Request, err error) {
 	// Format the message
 	var note string
 	if data.Note != "" {
