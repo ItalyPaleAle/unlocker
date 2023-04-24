@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gin-contrib/cors"
@@ -31,7 +32,7 @@ type Server struct {
 	httpClient *http.Client
 	log        *utils.AppLogger
 	states     map[string]*requestState
-	lock       *sync.RWMutex
+	lock       sync.RWMutex
 	webhook    *utils.Webhook
 	metrics    metrics.UnlockerMetrics
 	// Subscribers that receive public events
@@ -45,26 +46,35 @@ type Server struct {
 	metricsSrv *http.Server
 	// Method that forces a reload of TLS certificates from disk
 	tlsCertWatchFn tlsCertWatchFn
+	running        atomic.Bool
+}
+
+// NewServer creates a new Server object and initializes it
+func NewServer(log *utils.AppLogger) (*Server, error) {
+	s := &Server{
+		log:    log,
+		states: map[string]*requestState{},
+		subs:   map[string]chan *requestState{},
+		pubsub: utils.NewBroker[*requestStatePublic](),
+
+		httpClient: &http.Client{
+			Timeout: 15 * time.Second,
+		},
+	}
+
+	// Init the object
+	err := s.init()
+	if err != nil {
+		return nil, err
+	}
+
+	return s, nil
 }
 
 // Init the Server object and create a Gin server
-func (s *Server) Init(log *utils.AppLogger) error {
-	s.log = log
-	s.states = map[string]*requestState{}
-	s.lock = &sync.RWMutex{}
-	s.subs = map[string]chan *requestState{}
-	s.pubsub = utils.NewBroker[*requestStatePublic]()
-
-	// Set Gin to Release mode
-	gin.SetMode(gin.ReleaseMode)
-
+func (s *Server) init() error {
 	// Init the webhook
-	s.webhook = utils.NewWebhook(log)
-
-	// Init a HTTP client
-	s.httpClient = &http.Client{
-		Timeout: 15 * time.Second,
-	}
+	s.webhook = utils.NewWebhook(s.log)
 
 	// Init the Prometheus metrics
 	s.metrics.Init()
@@ -168,6 +178,11 @@ func (s *Server) initAppServer() error {
 // Start the web server
 // Note this function is blocking, and will return only when the servers are shut down via context cancellation.
 func (s *Server) Start(ctx context.Context) error {
+	if !s.running.CompareAndSwap(false, true) {
+		return errors.New("server is already running")
+	}
+	defer s.running.Store(false)
+
 	// App server
 	err := s.startAppServer()
 	if err != nil {

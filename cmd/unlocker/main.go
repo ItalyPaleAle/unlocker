@@ -7,6 +7,8 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/gin-gonic/gin"
+
 	"github.com/italypaleale/unlocker/pkg/server"
 	"github.com/italypaleale/unlocker/pkg/utils"
 )
@@ -14,6 +16,9 @@ import (
 var appLogger *utils.AppLogger
 
 func main() {
+	// Set Gin to Release mode
+	gin.SetMode(gin.ReleaseMode)
+
 	// Init the app logger object
 	var err error
 	appLogger, err = utils.NewAppLogger("unlocker", os.Stderr)
@@ -35,8 +40,7 @@ func main() {
 	}
 
 	// Create the Server object
-	srv := server.Server{}
-	err = srv.Init(appLogger)
+	srv, err := server.NewServer(appLogger)
 	if err != nil {
 		appLogger.Raw().Fatal().
 			AnErr("error", err).
