@@ -20,14 +20,10 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 
 	// Init the app logger object
-	var err error
-	appLogger, err = utils.NewAppLogger("unlocker", os.Stderr)
-	if err != nil {
-		panic(err)
-	}
+	appLogger = utils.NewAppLogger("unlocker", os.Stderr)
 
 	// Load config
-	err = loadConfig()
+	err := loadConfig()
 	if err != nil {
 		var lce *loadConfigError
 		if errors.As(err, &lce) {
@@ -67,7 +63,7 @@ func main() {
 	}()
 
 	// Start the server in background and block until the server is shut down (gracefully)
-	err = srv.Start(ctx)
+	err = srv.Run(ctx)
 	if err != nil {
 		appLogger.Raw().Fatal().
 			AnErr("error", err).

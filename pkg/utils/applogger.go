@@ -18,30 +18,29 @@ type AppLogger struct {
 }
 
 // NewAppLogger returns a new AppLogger object
-func NewAppLogger(app string, out io.Writer) (*AppLogger, error) {
+func NewAppLogger(app string, out io.Writer) *AppLogger {
 	a := &AppLogger{
 		App: app,
 	}
 	if out == nil {
 		out = gin.DefaultWriter
 	}
-	err := a.InitWithWriter(out)
-	return a, err
+	a.InitWithWriter(out)
+	return a
 }
 
 // Init the object with the default writer for gin
-func (a *AppLogger) Init() error {
-	return a.InitWithWriter(gin.DefaultWriter)
+func (a *AppLogger) Init() {
+	a.InitWithWriter(gin.DefaultWriter)
 }
 
 // InitWithWriter inits the object with a specified output writer
-func (a *AppLogger) InitWithWriter(out io.Writer) error {
+func (a *AppLogger) InitWithWriter(out io.Writer) {
 	lctx := zerolog.New(out).With().Timestamp()
 	if a.App != "" {
 		lctx = lctx.Str("app", a.App)
 	}
 	a.log = lctx.Logger()
-	return nil
 }
 
 // SetLogLevel updates the logger to set

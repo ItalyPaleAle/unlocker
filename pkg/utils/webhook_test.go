@@ -25,8 +25,7 @@ func TestWebhook(t *testing.T) {
 		config.KeyWebhookFormat: "",
 	})()
 
-	logger, err := NewAppLogger("test", io.Discard)
-	require.NoError(t, err)
+	logger := NewAppLogger("test", io.Discard)
 
 	clock := clocktesting.NewFakeClock(time.Now())
 	wh := newWebhookWithClock(logger, clock).(*webhookClient)
@@ -54,7 +53,7 @@ func TestWebhook(t *testing.T) {
 			reqCh := make(chan *http.Request, 1)
 			rt.reqCh = reqCh
 
-			err = wh.SendWebhook(context.Background(), getWebhookRequest())
+			err := wh.SendWebhook(context.Background(), getWebhookRequest())
 			assert.NoError(t, err)
 
 			r := <-reqCh
@@ -127,7 +126,7 @@ func TestWebhook(t *testing.T) {
 			rt.responses = nil
 		}()
 
-		err = wh.SendWebhook(context.Background(), getWebhookRequest())
+		err := wh.SendWebhook(context.Background(), getWebhookRequest())
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, "invalid response status code: 403")
 
@@ -150,7 +149,7 @@ func TestWebhook(t *testing.T) {
 		defer cancel()
 		doneCh := assertRetries(ctx, clock, reqCh, 3, 30*time.Second)
 
-		err = wh.SendWebhook(ctx, getWebhookRequest())
+		err := wh.SendWebhook(ctx, getWebhookRequest())
 		assert.NoError(t, err)
 
 		// This will receive an error after 3 requests have come in, or the context timed out
@@ -180,7 +179,7 @@ func TestWebhook(t *testing.T) {
 		defer cancel()
 		doneCh := assertRetries(ctx, clock, reqCh, 3, 5*time.Second)
 
-		err = wh.SendWebhook(ctx, getWebhookRequest())
+		err := wh.SendWebhook(ctx, getWebhookRequest())
 		assert.NoError(t, err)
 
 		// This will receive an error after 3 requests have come in, or the context timed out
@@ -201,7 +200,7 @@ func TestWebhook(t *testing.T) {
 		defer cancel()
 		doneCh := assertRetries(ctx, clock, reqCh, 2, 30*time.Second)
 
-		err = wh.SendWebhook(ctx, getWebhookRequest())
+		err := wh.SendWebhook(ctx, getWebhookRequest())
 		assert.NoError(t, err)
 
 		// This will receive an error after 3 requests have come in, or the context timed out
@@ -224,7 +223,7 @@ func TestWebhook(t *testing.T) {
 		defer cancel()
 		doneCh := assertRetries(ctx, clock, reqCh, 3, 30*time.Second)
 
-		err = wh.SendWebhook(ctx, getWebhookRequest())
+		err := wh.SendWebhook(ctx, getWebhookRequest())
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, "invalid response status code: 429")
 
@@ -248,7 +247,7 @@ func TestWebhook(t *testing.T) {
 		defer cancel()
 		doneCh := assertRetries(ctx, clock, reqCh, 3, 30*time.Second)
 
-		err = wh.SendWebhook(ctx, getWebhookRequest())
+		err := wh.SendWebhook(ctx, getWebhookRequest())
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, "invalid response status code: 502")
 

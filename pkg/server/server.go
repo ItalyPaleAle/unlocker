@@ -47,6 +47,11 @@ type Server struct {
 	// Method that forces a reload of TLS certificates from disk
 	tlsCertWatchFn tlsCertWatchFn
 	running        atomic.Bool
+
+	// Listeners for the app and metrics servers
+	// These can be used for testing without having to start an actual TCP listener
+	appListener     net.Listener
+	metricsListener net.Listener
 }
 
 // NewServer creates a new Server object and initializes it
@@ -173,9 +178,9 @@ func (s *Server) initAppServer() error {
 	return nil
 }
 
-// Start the web server
+// Run the web server
 // Note this function is blocking, and will return only when the servers are shut down via context cancellation.
-func (s *Server) Start(ctx context.Context) error {
+func (s *Server) Run(ctx context.Context) error {
 	if !s.running.CompareAndSwap(false, true) {
 		return errors.New("server is already running")
 	}
@@ -239,15 +244,25 @@ func (s *Server) startAppServer() error {
 	}
 	s.tlsCertWatchFn = tlsCertReloadFn
 
+	// Create the listener if we don't have one already
+	if s.appListener == nil {
+		s.appListener, err = net.Listen("tcp", s.appSrv.Addr)
+		if err != nil {
+			return fmt.Errorf("failed to create TCP listener: %w", err)
+		}
+	}
+
 	// Start the HTTPS server in a background goroutine
 	go func() {
+		defer s.appListener.Close()
+
 		s.log.Raw().Info().
 			Str("bind", bindAddr).
 			Int("port", bindPort).
 			Str("url", viper.GetString(config.KeyBaseUrl)).
 			Msg("App server started")
 		// Next call blocks until the server is shut down
-		err := s.appSrv.ListenAndServeTLS("", "")
+		err := s.appSrv.ServeTLS(s.appListener, "", "")
 		if err != http.ErrServerClosed {
 			s.log.Raw().Fatal().Msgf("Error starting app server: %v", err)
 		}
@@ -293,14 +308,25 @@ func (s *Server) startMetricsServer() error {
 		ReadHeaderTimeout: 10 * time.Second,
 	}
 
+	// Create the listener if we don't have one already
+	if s.metricsListener == nil {
+		var err error
+		s.metricsListener, err = net.Listen("tcp", s.metricsSrv.Addr)
+		if err != nil {
+			return fmt.Errorf("failed to create TCP listener: %w", err)
+		}
+	}
+
 	// Start the HTTPS server in a background goroutine
 	go func() {
+		defer s.metricsListener.Close()
+
 		s.log.Raw().Info().
 			Str("bind", bindAddr).
 			Int("port", bindPort).
 			Msg("Metrics server started")
 		// Next call blocks until the server is shut down
-		err := s.metricsSrv.ListenAndServe()
+		err := s.metricsSrv.Serve(s.metricsListener)
 		if err != http.ErrServerClosed {
 			s.log.Raw().Fatal().Msgf("Error starting metrics server: %v", err)
 		}

@@ -20,11 +20,7 @@ func SetAppLogger(appLogger **AppLogger, dest io.Writer) func() {
 	if dest == nil {
 		dest = os.Stderr
 	}
-	var err error
-	*appLogger, err = NewAppLogger("test", dest)
-	if err != nil {
-		panic(err)
-	}
+	*appLogger = NewAppLogger("test", dest)
 	(*appLogger).SetLogLevel(zerolog.DebugLevel)
 
 	return func() {

@@ -69,7 +69,7 @@ func (s *Server) RouteAuthSignin(c *gin.Context) {
 	// Set the auth state as a secure cookie
 	// This may reset the existing cookie
 	secureCookie := c.Request.URL.Scheme == "https:"
-	err = setSecureCookie(c, authStateCookieName, seed, int(authStateCookieMaxAge.Seconds()), "/", c.Request.URL.Host, secureCookie, true)
+	err = setSecureCookie(c, authStateCookieName, seed, authStateCookieMaxAge, "/", c.Request.URL.Host, secureCookie, true)
 	if err != nil {
 		_ = c.Error(fmt.Errorf("failed to set access token secure cookie: %w", err))
 		c.AbortWithStatusJSON(http.StatusInternalServerError, InternalServerError)
@@ -148,9 +148,9 @@ func (s *Server) RouteAuthConfirm(c *gin.Context) {
 	}
 
 	// Expiration is the minimum of the session timeout set in the config, and the token's expiration
-	expiration := viper.GetInt(config.KeySessionTimeout)
-	if accessToken.ExpiresIn > 0 && expiration > accessToken.ExpiresIn {
-		expiration = accessToken.ExpiresIn
+	expiration := viper.GetDuration(config.KeySessionTimeout)
+	if accessToken.ExpiresIn > 0 && int(expiration.Seconds()) > accessToken.ExpiresIn {
+		expiration = time.Duration(accessToken.ExpiresIn) * time.Second
 	}
 
 	// Set the access token in a cookie

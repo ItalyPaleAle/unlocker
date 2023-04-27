@@ -77,7 +77,7 @@ func getSecureCookie(c *gin.Context, name string) (plaintextValue string, ttl ti
 	return v, ttl, nil
 }
 
-func setSecureCookie(c *gin.Context, name string, plaintextValue string, expiration int, path string, domain string, secureCookie bool, httpOnly bool) error {
+func setSecureCookie(c *gin.Context, name string, plaintextValue string, expiration time.Duration, path string, domain string, secureCookie bool, httpOnly bool) error {
 	if expiration < 1 {
 		return errors.New("invalid expiration value: must be greater than 0")
 	}
@@ -100,7 +100,7 @@ func setSecureCookie(c *gin.Context, name string, plaintextValue string, expirat
 		}).
 		IssuedAt(now).
 		// Add 1 extra second to synchronize with cookie expiry
-		Expiration(now.Add(time.Duration(expiration+1)*time.Second)).
+		Expiration(now.Add(expiration+time.Second)).
 		NotBefore(now).
 		Claim("v", plaintextValue).
 		Build()
@@ -121,7 +121,7 @@ func setSecureCookie(c *gin.Context, name string, plaintextValue string, expirat
 	}
 
 	// Set the cookie
-	c.SetCookie(name, string(cookieValue), expiration, "/", c.Request.URL.Host, secureCookie, true)
+	c.SetCookie(name, string(cookieValue), int(expiration.Seconds()), "/", c.Request.URL.Host, secureCookie, true)
 
 	return nil
 }
