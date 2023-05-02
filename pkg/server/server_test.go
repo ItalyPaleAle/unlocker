@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/json"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -68,23 +69,7 @@ func TestServerLifecycle(t *testing.T) {
 			srv, cleanup := newTestServer(t, nil)
 			require.NotNil(t, srv)
 			defer cleanup()
-
-			// Start the server in a background goroutine
-			srvCtx, srvCancel := context.WithCancel(context.Background())
-			defer srvCancel()
-			startErrCh := make(chan error, 1)
-			go func() {
-				startErrCh <- srv.Run(srvCtx)
-			}()
-
-			// Ensure the server has started and there's no error
-			// This may report false positives if the server just takes longer to start, but we'll still catch those errors later on
-			select {
-			case <-time.After(100 * time.Millisecond):
-				// all good
-			case err := <-startErrCh:
-				t.Fatalf("Received an unexpected error in startErrCh: %v", err)
-			}
+			stopServerFn := startTestServer(t, srv)
 
 			// Make a request to the /healthz endpoint in the app server
 			appClient := clientForListener(srv.appListener)
@@ -97,6 +82,10 @@ func TestServerLifecycle(t *testing.T) {
 			require.NoError(t, err)
 			defer res.Body.Close()
 
+			healthzRes, err := io.ReadAll(res.Body)
+			require.NoError(t, err)
+			require.NotEmpty(t, healthzRes)
+
 			// Make a request to the /healthz endpoint in the metrics server
 			if metricsEnabled {
 				metricsClient := clientForListener(srv.metricsListener)
@@ -108,19 +97,52 @@ func TestServerLifecycle(t *testing.T) {
 				res, err = metricsClient.Do(req)
 				require.NoError(t, err)
 				defer res.Body.Close()
+
+				resBody, err := io.ReadAll(res.Body)
+				require.NoError(t, err)
+				require.Equal(t, healthzRes, resBody)
 			}
 
 			// Shutdown the server
-			srvCancel()
-
-			// At the end of the test, there should be no error
-			require.NoError(t, <-startErrCh, "received an unexpected error in startErrCh")
+			stopServerFn(t)
 		}
 	}
 
 	t.Run("run the server without metrics", testFn(false))
 
 	t.Run("run the server with metrics enabled", testFn(true))
+}
+
+func TestServerHealthz(t *testing.T) {
+	// Create the server
+	// This will create in-memory listeners with bufconn too
+	srv, cleanup := newTestServer(t, nil)
+	require.NotNil(t, srv)
+	defer cleanup()
+	stopServerFn := startTestServer(t, srv)
+
+	// Make a request to the /healthz endpoint
+	appClient := clientForListener(srv.appListener)
+	reqCtx, reqCancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer reqCancel()
+	req, err := http.NewRequestWithContext(reqCtx, http.MethodGet,
+		fmt.Sprintf("https://localhost:%d/healthz", testServerPort), nil)
+	require.NoError(t, err)
+	res, err := appClient.Do(req)
+	require.NoError(t, err)
+	defer res.Body.Close()
+
+	// Check the response
+	require.Equal(t, "application/json", res.Header.Get("content-type"))
+
+	body := map[string]any{}
+	err = json.NewDecoder(res.Body).Decode(&body)
+	require.NoError(t, err)
+	require.NotEmpty(t, body)
+	require.Equal(t, "ok", body["status"])
+
+	// Shutdown the server
+	stopServerFn(t)
 }
 
 func newTestServer(t *testing.T, wh *mockWebhook) (*Server, func()) {
@@ -145,6 +167,37 @@ func newTestServer(t *testing.T, wh *mockWebhook) (*Server, func()) {
 	})
 
 	return srv, cleanup
+}
+
+func startTestServer(t *testing.T, srv *Server) func(t *testing.T) {
+	t.Helper()
+
+	// Start the server in a background goroutine
+	srvCtx, srvCancel := context.WithCancel(context.Background())
+	startErrCh := make(chan error, 1)
+	go func() {
+		startErrCh <- srv.Run(srvCtx)
+	}()
+
+	// Ensure the server has started and there's no error
+	// This may report false positives if the server just takes longer to start, but we'll still catch those errors later on
+	select {
+	case <-time.After(100 * time.Millisecond):
+		// all good
+	case err := <-startErrCh:
+		t.Fatalf("Received an unexpected error in startErrCh: %v", err)
+	}
+
+	// Return a function to tear down the test server, which must be invoked at the end of the test
+	return func(t *testing.T) {
+		t.Helper()
+
+		// Shutdown the server
+		srvCancel()
+
+		// At the end of the test, there should be no error
+		require.NoError(t, <-startErrCh, "received an unexpected error in startErrCh")
+	}
 }
 
 func clientForListener(ln net.Listener) *http.Client {
