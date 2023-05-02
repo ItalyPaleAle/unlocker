@@ -1,6 +1,6 @@
 package keyvault
 
-import "github.com/Azure/azure-sdk-for-go/sdk/keyvault/azkeys"
+import "github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azkeys"
 
 var supportedAlgorithms map[string]struct{}
 
