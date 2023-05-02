@@ -17,7 +17,6 @@ import (
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/spf13/viper"
 
 	"github.com/italypaleale/unlocker/pkg/config"
@@ -201,9 +200,9 @@ func (s *Server) Run(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
+		//nolint:errcheck
+		defer s.stopMetricsServer()
 	}
-	//nolint:errcheck
-	defer s.stopMetricsServer()
 
 	// If we have a tlsCertWatchFn, invoke that
 	if s.tlsCertWatchFn != nil {
@@ -298,7 +297,7 @@ func (s *Server) startMetricsServer() error {
 	// Handler
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", s.RouteHealthzHandler)
-	mux.Handle("/metrics", promhttp.Handler())
+	mux.Handle("/metrics", s.metrics.HTTPHandler())
 
 	// Create the HTTP server
 	s.metricsSrv = &http.Server{
