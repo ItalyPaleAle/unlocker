@@ -102,14 +102,14 @@ func (s *Server) RouteAuthSignin(c *gin.Context) {
 // RouteAuthConfirm is the handler for the GET /auth/confirm request
 // This exchanges an authorization code for an access token
 func (s *Server) RouteAuthConfirm(c *gin.Context) {
-	// Ensure we have the required params in the querystring
+	// Ensure we have the required params in the query string
 	code := c.Query("code")
 	if code == "" {
 		_ = c.Error(errors.New("Parameter code is missing in the request"))
 		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Parameter code is missing in the request"))
 		return
 	}
-	// Note that this is the auth stateToken, not the stateToken of the operation
+	// Note that this is the auth state token, not the state of the operation
 	stateToken := c.Query("state")
 	if stateToken == "" {
 		_ = c.Error(errors.New("Parameter state is missing in the request"))
@@ -124,7 +124,7 @@ func (s *Server) RouteAuthConfirm(c *gin.Context) {
 	}
 	if err != nil {
 		_ = c.Error(fmt.Errorf("failed to retrieve auth state cookie: %w", err))
-		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("auth state cookie is missing or invalid"))
+		c.AbortWithStatusJSON(http.StatusBadRequest, ErrorResponse("Auth state cookie is missing or invalid"))
 		return
 	}
 
