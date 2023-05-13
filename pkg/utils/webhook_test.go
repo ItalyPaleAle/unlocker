@@ -31,8 +31,8 @@ func TestWebhook(t *testing.T) {
 	wh := newWebhookWithClock(logger, clock).(*webhookClient)
 
 	// Create a roundtripper that captures the requests
-	rt := &roundTripperTest{}
-	wh.httpClient.Transport = rt
+	rtt := &RoundTripperTest{}
+	wh.httpClient.Transport = rtt
 
 	getWebhookRequest := func() *WebhookRequest {
 		return &WebhookRequest{
@@ -51,7 +51,7 @@ func TestWebhook(t *testing.T) {
 			}
 
 			reqCh := make(chan *http.Request, 1)
-			rt.reqCh = reqCh
+			rtt.SetReqCh(reqCh)
 
 			err := wh.SendWebhook(context.Background(), getWebhookRequest())
 			assert.NoError(t, err)
@@ -117,13 +117,13 @@ func TestWebhook(t *testing.T) {
 
 	t.Run("fail on 4xx status codes", func(t *testing.T) {
 		reqCh := make(chan *http.Request, 1)
-		rt.reqCh = reqCh
-		rt.responses = make(chan *http.Response, 1)
-		rt.responses <- &http.Response{
+		rtt.SetReqCh(reqCh)
+		rtt.responses = make(chan *http.Response, 1)
+		rtt.responses <- &http.Response{
 			StatusCode: http.StatusForbidden,
 		}
 		defer func() {
-			rt.responses = nil
+			rtt.responses = nil
 		}()
 
 		err := wh.SendWebhook(context.Background(), getWebhookRequest())
@@ -136,13 +136,13 @@ func TestWebhook(t *testing.T) {
 
 	t.Run("retry on 429 status codes without Retry-After header", func(t *testing.T) {
 		reqCh := make(chan *http.Request)
-		rt.reqCh = reqCh
-		rt.responses = make(chan *http.Response, 2)
+		rtt.SetReqCh(reqCh)
+		rtt.responses = make(chan *http.Response, 2)
 		// Send a 429 status code twice
-		rt.responses <- &http.Response{StatusCode: http.StatusTooManyRequests}
-		rt.responses <- &http.Response{StatusCode: http.StatusTooManyRequests}
+		rtt.responses <- &http.Response{StatusCode: http.StatusTooManyRequests}
+		rtt.responses <- &http.Response{StatusCode: http.StatusTooManyRequests}
 		defer func() {
-			rt.responses = nil
+			rtt.responses = nil
 		}()
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -158,8 +158,8 @@ func TestWebhook(t *testing.T) {
 
 	t.Run("retry on 429 status codes respects Retry-After header", func(t *testing.T) {
 		reqCh := make(chan *http.Request)
-		rt.reqCh = reqCh
-		rt.responses = make(chan *http.Response, 2)
+		rtt.SetReqCh(reqCh)
+		rtt.responses = make(chan *http.Response, 2)
 		makeRes := func() *http.Response {
 			res := &http.Response{
 				StatusCode: http.StatusTooManyRequests,
@@ -169,10 +169,10 @@ func TestWebhook(t *testing.T) {
 			return res
 		}
 		// Send a 429 status code twice but with a Retry-After header
-		rt.responses <- makeRes() //nolint:bodyclose
-		rt.responses <- makeRes() //nolint:bodyclose
+		rtt.responses <- makeRes() //nolint:bodyclose
+		rtt.responses <- makeRes() //nolint:bodyclose
 		defer func() {
-			rt.responses = nil
+			rtt.responses = nil
 		}()
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -188,12 +188,12 @@ func TestWebhook(t *testing.T) {
 
 	t.Run("retry on 5xx status codes", func(t *testing.T) {
 		reqCh := make(chan *http.Request)
-		rt.reqCh = reqCh
-		rt.responses = make(chan *http.Response, 1)
+		rtt.SetReqCh(reqCh)
+		rtt.responses = make(chan *http.Response, 1)
 		// Send a 500 status code once
-		rt.responses <- &http.Response{StatusCode: http.StatusInternalServerError}
+		rtt.responses <- &http.Response{StatusCode: http.StatusInternalServerError}
 		defer func() {
-			rt.responses = nil
+			rtt.responses = nil
 		}()
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -209,14 +209,14 @@ func TestWebhook(t *testing.T) {
 
 	t.Run("too many failed attempts with 429 status codes", func(t *testing.T) {
 		reqCh := make(chan *http.Request)
-		rt.reqCh = reqCh
-		rt.responses = make(chan *http.Response, 3)
+		rtt.SetReqCh(reqCh)
+		rtt.responses = make(chan *http.Response, 3)
 		// Send a 429 status code 3 times
-		rt.responses <- &http.Response{StatusCode: http.StatusTooManyRequests}
-		rt.responses <- &http.Response{StatusCode: http.StatusTooManyRequests}
-		rt.responses <- &http.Response{StatusCode: http.StatusTooManyRequests}
+		rtt.responses <- &http.Response{StatusCode: http.StatusTooManyRequests}
+		rtt.responses <- &http.Response{StatusCode: http.StatusTooManyRequests}
+		rtt.responses <- &http.Response{StatusCode: http.StatusTooManyRequests}
 		defer func() {
-			rt.responses = nil
+			rtt.responses = nil
 		}()
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -233,14 +233,14 @@ func TestWebhook(t *testing.T) {
 
 	t.Run("too many failed attempts with 5xx status codes", func(t *testing.T) {
 		reqCh := make(chan *http.Request)
-		rt.reqCh = reqCh
-		rt.responses = make(chan *http.Response, 3)
+		rtt.SetReqCh(reqCh)
+		rtt.responses = make(chan *http.Response, 3)
 		// Send a 429 status code 3 times
-		rt.responses <- &http.Response{StatusCode: http.StatusInternalServerError}
-		rt.responses <- &http.Response{StatusCode: http.StatusBadGateway}
-		rt.responses <- &http.Response{StatusCode: http.StatusBadGateway}
+		rtt.responses <- &http.Response{StatusCode: http.StatusInternalServerError}
+		rtt.responses <- &http.Response{StatusCode: http.StatusBadGateway}
+		rtt.responses <- &http.Response{StatusCode: http.StatusBadGateway}
 		defer func() {
-			rt.responses = nil
+			rtt.responses = nil
 		}()
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -264,31 +264,6 @@ func TestWebhook(t *testing.T) {
 		assert.Error(t, err)
 		assert.ErrorContains(t, err, "failed to create request")
 	})
-}
-
-type roundTripperTest struct {
-	reqCh     chan *http.Request
-	responses chan *http.Response
-}
-
-func (t *roundTripperTest) RoundTrip(r *http.Request) (*http.Response, error) {
-	defer func() {
-		t.reqCh <- r
-	}()
-
-	// If there's a response to send in the channel, use that
-	// Otherwise create a default one wth the 200 status code
-	var resp *http.Response
-	select {
-	case resp = <-t.responses:
-		// Nop
-	default:
-		resp = &http.Response{
-			StatusCode: http.StatusOK,
-		}
-	}
-
-	return resp, nil
 }
 
 func requireBodyEqual(t *testing.T, body io.ReadCloser, expect string) {

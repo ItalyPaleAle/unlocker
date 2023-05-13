@@ -69,7 +69,7 @@ func (s *Server) RouteAuthSignin(c *gin.Context) {
 	// Set the auth state as a secure cookie
 	// This may reset the existing cookie
 	secureCookie := c.Request.URL.Scheme == "https:"
-	err = setSecureCookie(c, authStateCookieName, seed, authStateCookieMaxAge, "/", c.Request.URL.Host, secureCookie, true)
+	err = setSecureCookie(c, authStateCookieName, seed, authStateCookieMaxAge, "/auth", c.Request.URL.Host, secureCookie, true)
 	if err != nil {
 		_ = c.Error(fmt.Errorf("failed to set access token secure cookie: %w", err))
 		c.AbortWithStatusJSON(http.StatusInternalServerError, InternalServerError)
@@ -130,7 +130,7 @@ func (s *Server) RouteAuthConfirm(c *gin.Context) {
 
 	// Unset the auth state cookie
 	secureCookie := c.Request.URL.Scheme == "https:"
-	c.SetCookie(authStateCookieName, "", -1, "/", c.Request.URL.Host, secureCookie, true)
+	c.SetCookie(authStateCookieName, "", -1, "/auth", c.Request.URL.Host, secureCookie, true)
 
 	// Validate the state token
 	if !validateStateToken(c, stateToken, seed) {

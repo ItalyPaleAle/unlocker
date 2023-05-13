@@ -1,6 +1,7 @@
 package server
 
 import (
+	"bytes"
 	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
@@ -26,6 +27,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/lestrrat-go/jwx/v2/jwk"
+	"github.com/spf13/viper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -80,7 +82,7 @@ func TestServerLifecycle(t *testing.T) {
 
 			// Create the server
 			// This will create in-memory listeners with bufconn too
-			srv, cleanup := newTestServer(t, nil)
+			srv, _, cleanup := newTestServer(t, nil, nil)
 			require.NotNil(t, srv)
 			defer cleanup()
 			stopServerFn := startTestServer(t, srv)
@@ -94,7 +96,7 @@ func TestServerLifecycle(t *testing.T) {
 			require.NoError(t, err)
 			res, err := appClient.Do(req)
 			require.NoError(t, err)
-			defer res.Body.Close()
+			defer closeBody(res)
 
 			healthzRes, err := io.ReadAll(res.Body)
 			require.NoError(t, err)
@@ -110,7 +112,7 @@ func TestServerLifecycle(t *testing.T) {
 				require.NoError(t, err)
 				res, err = metricsClient.Do(req)
 				require.NoError(t, err)
-				defer res.Body.Close()
+				defer closeBody(res)
 
 				resBody, err := io.ReadAll(res.Body)
 				require.NoError(t, err)
@@ -128,12 +130,17 @@ func TestServerLifecycle(t *testing.T) {
 }
 
 func TestServerAppRoutes(t *testing.T) {
+	// Create a roundtripper that captures the requests
+	rtt := &utils.RoundTripperTest{}
+
 	// Create the server
 	// This will create in-memory listeners with bufconn too
-	srv, cleanup := newTestServer(t, nil)
+	srv, logBuf, cleanup := newTestServer(t, nil, rtt)
 	require.NotNil(t, srv)
 	defer cleanup()
 	stopServerFn := startTestServer(t, srv)
+
+	var accessTokenCookie *http.Cookie
 
 	// Test the healthz endpoints
 	t.Run("healthz", func(t *testing.T) {
@@ -146,7 +153,7 @@ func TestServerAppRoutes(t *testing.T) {
 		require.NoError(t, err)
 		res, err := appClient.Do(req)
 		require.NoError(t, err)
-		defer res.Body.Close()
+		defer closeBody(res)
 
 		// Check the response
 		require.Equal(t, "application/json", res.Header.Get("content-type"))
@@ -156,6 +163,9 @@ func TestServerAppRoutes(t *testing.T) {
 		require.NoError(t, err)
 		require.NotEmpty(t, body)
 		require.Equal(t, "ok", body["status"])
+
+		// Reset the log buffer
+		logBuf.Reset()
 	})
 
 	// Test the auth routes
@@ -163,8 +173,8 @@ func TestServerAppRoutes(t *testing.T) {
 		appClient := clientForListener(srv.appListener)
 
 		var (
-			authStateCookie *http.Cookie
 			authState       string
+			authStateCookie *http.Cookie
 		)
 
 		// Make a request to the /auth/signin endpoint
@@ -176,7 +186,7 @@ func TestServerAppRoutes(t *testing.T) {
 			require.NoError(t, err)
 			res, err := appClient.Do(req)
 			require.NoError(t, err)
-			defer res.Body.Close()
+			defer closeBody(res)
 
 			// Ensure the redirect is present
 			require.Equal(t, http.StatusTemporaryRedirect, res.StatusCode)
@@ -202,12 +212,33 @@ func TestServerAppRoutes(t *testing.T) {
 			require.Len(t, cookies, 1)
 			require.NotNil(t, cookies[0])
 
+			require.Equal(t, "_auth_state", cookies[0].Name)
+			require.Equal(t, "/auth", cookies[0].Path)
+			require.NoError(t, cookies[0].Valid())
+			require.NotEmpty(t, cookies[0].Value)
+			require.Greater(t, cookies[0].MaxAge, 1)
 			authStateCookie = cookies[0]
-			assert.Equal(t, "_auth_state", authStateCookie.Name)
 		})
 
-		// We cannot test a successful /auth/confirm route as that requires user interaction
 		t.Run("confirm", func(t *testing.T) {
+			// Helper function that ensures the auth state cookie is unset in case of errors
+			ensureAuthStateCookieUnset := func(t *testing.T, res *http.Response) {
+				var found bool
+				for _, cookie := range res.Cookies() {
+					if cookie.Name != "_auth_state" {
+						continue
+					}
+
+					found = true
+					require.NoError(t, cookie.Valid())
+					require.Empty(t, cookie.Value)
+					require.Equal(t, -1, cookie.MaxAge)
+					require.Equal(t, "/auth", cookie.Path)
+				}
+
+				require.True(t, found)
+			}
+
 			t.Run("Missing code", func(t *testing.T) {
 				reqCtx, reqCancel := context.WithTimeout(context.Background(), 2*time.Second)
 				defer reqCancel()
@@ -216,12 +247,15 @@ func TestServerAppRoutes(t *testing.T) {
 				require.NoError(t, err)
 				res, err := appClient.Do(req)
 				require.NoError(t, err)
-				defer res.Body.Close()
+				defer closeBody(res)
 
 				assertResponseError(t, res, http.StatusBadRequest, "Parameter code is missing in the request")
 			})
 
 			t.Run("Missing state", func(t *testing.T) {
+				// Reset the log buffer before starting
+				logBuf.Reset()
+
 				reqCtx, reqCancel := context.WithTimeout(context.Background(), 2*time.Second)
 				defer reqCancel()
 				req, err := http.NewRequestWithContext(reqCtx, http.MethodGet,
@@ -229,9 +263,12 @@ func TestServerAppRoutes(t *testing.T) {
 				require.NoError(t, err)
 				res, err := appClient.Do(req)
 				require.NoError(t, err)
-				defer res.Body.Close()
+				defer closeBody(res)
 
 				assertResponseError(t, res, http.StatusBadRequest, "Parameter state is missing in the request")
+
+				// Ensure that the logs do not contain the code and state
+				assert.Contains(t, logBuf.String(), `"status":400,"method":"GET","path":"/auth/confirm?code***",`)
 			})
 
 			t.Run("Missing auth state cookie", func(t *testing.T) {
@@ -242,7 +279,7 @@ func TestServerAppRoutes(t *testing.T) {
 				require.NoError(t, err)
 				res, err := appClient.Do(req)
 				require.NoError(t, err)
-				defer res.Body.Close()
+				defer closeBody(res)
 
 				assertResponseError(t, res, http.StatusBadRequest, "Auth state cookie is missing or invalid")
 			})
@@ -258,21 +295,89 @@ func TestServerAppRoutes(t *testing.T) {
 
 				res, err := appClient.Do(req)
 				require.NoError(t, err)
-				defer res.Body.Close()
+				defer closeBody(res)
 
 				assertResponseError(t, res, http.StatusBadRequest, "The state token could not be validated")
+				ensureAuthStateCookieUnset(t, res)
+			})
+
+			t.Run("Exchange for access token", func(t *testing.T) {
+				reqCh := make(chan *http.Request, 1)
+				responsesCh := make(chan *http.Response, 1)
+				responsesCh <- &http.Response{
+					StatusCode: http.StatusForbidden,
+					Body:       io.NopCloser(strings.NewReader(`{"token_type":"Bearer","scope":"https://vault.azure.net/user_impersonation","access_token":"my-access-token","expires_in":3600}`)),
+				}
+				rtt.SetReqCh(reqCh)
+				rtt.SetResponsesCh(responsesCh)
+				defer func() {
+					rtt.SetReqCh(nil)
+					rtt.SetResponsesCh(nil)
+				}()
+
+				reqCtx, reqCancel := context.WithTimeout(context.Background(), 2*time.Second)
+				defer reqCancel()
+				req, err := http.NewRequestWithContext(reqCtx, http.MethodGet,
+					fmt.Sprintf("https://localhost:%d/auth/confirm?code=auth-code&state=%s", testServerPort, authState), nil)
+				require.NoError(t, err)
+				req.AddCookie(authStateCookie)
+
+				res, err := appClient.Do(req)
+				require.NoError(t, err)
+				defer closeBody(res)
+
+				// Ensure the redirect is present
+				require.Equal(t, http.StatusTemporaryRedirect, res.StatusCode)
+
+				loc := res.Header.Get("location")
+				require.Equal(t, viper.GetString(config.KeyBaseUrl), loc)
+
+				// Ensure the cookies are present
+				// Should both set _at and reset _auth_state
+				cookies := res.Cookies()
+				require.NotEmpty(t, cookies)
+				require.Len(t, cookies, 2)
+
+				for _, cookie := range cookies {
+					require.NotNil(t, cookie)
+					switch cookie.Name {
+					case "_at":
+						require.NoError(t, cookie.Valid())
+						require.NotEmpty(t, cookie.Value)
+						require.Equal(t, int(viper.GetDuration(config.KeySessionTimeout).Seconds()), cookie.MaxAge)
+						require.Equal(t, "/", cookie.Path)
+						accessTokenCookie = cookie
+					case "_auth_state":
+						require.NoError(t, cookie.Valid())
+						require.Empty(t, cookie.Value)
+						require.Equal(t, -1, cookie.MaxAge)
+						require.Equal(t, "/auth", cookie.Path)
+						authStateCookie = nil
+					default:
+						t.Fatal("Found unexpected cookie:", cookie.Name)
+					}
+				}
 			})
 		})
+
+		// Reset the log buffer
+		logBuf.Reset()
 	})
+
+	// If we don't have an access token, stop here since we can't test the next routes
+	require.NotEmpty(t, accessTokenCookie, "Cannot continue tests without an access token")
 
 	// Shutdown the server
 	stopServerFn(t)
 }
 
-func newTestServer(t *testing.T, wh *mockWebhook) (*Server, func()) {
+func newTestServer(t *testing.T, wh *mockWebhook, httpClientTransport http.RoundTripper) (*Server, *bytes.Buffer, func()) {
 	t.Helper()
 
-	log := utils.NewAppLogger("test", os.Stderr)
+	logBuf := &bytes.Buffer{}
+	logDest := io.MultiWriter(os.Stderr, logBuf)
+
+	log := utils.NewAppLogger("test", logDest)
 	if wh == nil {
 		wh = &mockWebhook{}
 	}
@@ -282,6 +387,10 @@ func newTestServer(t *testing.T, wh *mockWebhook) (*Server, func()) {
 	srv.appListener = bufconn.Listen(bufconnBufSize)
 	srv.metricsListener = bufconn.Listen(bufconnBufSize)
 
+	if httpClientTransport != nil {
+		srv.httpClient.Transport = httpClientTransport
+	}
+
 	cert, key, err := getSelfSignedTLSCredentials()
 	require.NoError(t, err, "cannot get TLS credentials")
 
@@ -290,7 +399,7 @@ func newTestServer(t *testing.T, wh *mockWebhook) (*Server, func()) {
 		config.KeyTLSKeyPEM:  key,
 	})
 
-	return srv, cleanup
+	return srv, logBuf, cleanup
 }
 
 func startTestServer(t *testing.T, srv *Server) func(t *testing.T) {
@@ -404,4 +513,11 @@ func (w mockWebhook) SendWebhook(_ context.Context, data *utils.WebhookRequest) 
 		w.requests <- data
 	}
 	return nil
+}
+
+// Closes a HTTP response body making sure to drain it first
+// Normally invoked as a defer'd function
+func closeBody(res *http.Response) {
+	_, _ = io.Copy(io.Discard, res.Body)
+	res.Body.Close()
 }
