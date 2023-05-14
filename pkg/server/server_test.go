@@ -86,6 +86,7 @@ func TestServerLifecycle(t *testing.T) {
 			require.NotNil(t, srv)
 			defer cleanup()
 			stopServerFn := startTestServer(t, srv)
+			defer stopServerFn(t)
 
 			// Make a request to the /healthz endpoint in the app server
 			appClient := clientForListener(srv.appListener)
@@ -118,9 +119,6 @@ func TestServerLifecycle(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, healthzRes, resBody)
 			}
-
-			// Shutdown the server
-			stopServerFn(t)
 		}
 	}
 
@@ -130,6 +128,8 @@ func TestServerLifecycle(t *testing.T) {
 }
 
 func TestServerAppRoutes(t *testing.T) {
+	var accessTokenCookie *http.Cookie
+
 	// Create a roundtripper that captures the requests
 	rtt := &utils.RoundTripperTest{}
 
@@ -139,13 +139,15 @@ func TestServerAppRoutes(t *testing.T) {
 	require.NotNil(t, srv)
 	defer cleanup()
 	stopServerFn := startTestServer(t, srv)
+	defer stopServerFn(t)
+	appClient := clientForListener(srv.appListener)
 
-	var accessTokenCookie *http.Cookie
+	// Add a route group for routes specific to some tests
+	testRoutes := srv.appRouter.Group("/_test")
 
 	// Test the healthz endpoints
 	t.Run("healthz", func(t *testing.T) {
 		// Make a request to the /healthz endpoint
-		appClient := clientForListener(srv.appListener)
 		reqCtx, reqCancel := context.WithTimeout(context.Background(), 2*time.Second)
 		defer reqCancel()
 		req, err := http.NewRequestWithContext(reqCtx, http.MethodGet,
@@ -170,8 +172,6 @@ func TestServerAppRoutes(t *testing.T) {
 
 	// Test the auth routes
 	t.Run("auth", func(t *testing.T) {
-		appClient := clientForListener(srv.appListener)
-
 		var (
 			authState       string
 			authStateCookie *http.Cookie
@@ -367,8 +367,64 @@ func TestServerAppRoutes(t *testing.T) {
 	// If we don't have an access token, stop here since we can't test the next routes
 	require.NotEmpty(t, accessTokenCookie, "Cannot continue tests without an access token")
 
-	// Shutdown the server
-	stopServerFn(t)
+	t.Run("auth middleware", func(t *testing.T) {
+		// Add routes specifically to test the auth middleware
+		testRoutes.GET("/auth",
+			srv.AccessTokenMiddleware(AccessTokenMiddlewareOpts{Required: true}),
+			func(c *gin.Context) {
+				c.Status(http.StatusNoContent)
+			},
+		)
+		testRoutes.GET("/auth-header",
+			srv.AccessTokenMiddleware(AccessTokenMiddlewareOpts{Required: true, AllowAccessTokenInHeader: true}),
+			func(c *gin.Context) {
+				c.Status(http.StatusNoContent)
+			},
+		)
+
+		authTestFn := func(success bool, path string, modifier func(req *http.Request)) func(t *testing.T) {
+			return func(t *testing.T) {
+				reqCtx, reqCancel := context.WithTimeout(context.Background(), 2*time.Second)
+				defer reqCancel()
+				req, err := http.NewRequestWithContext(reqCtx, http.MethodGet,
+					fmt.Sprintf("https://localhost:%d/_test/%s", testServerPort, path), nil)
+				require.NoError(t, err)
+				if modifier != nil {
+					modifier(req)
+				}
+
+				res, err := appClient.Do(req)
+				require.NoError(t, err)
+				defer closeBody(res)
+
+				fmt.Println(res.Header)
+
+				if success {
+					require.Equal(t, http.StatusNoContent, res.StatusCode)
+				} else {
+					require.Equal(t, http.StatusUnauthorized, res.StatusCode)
+				}
+			}
+		}
+
+		t.Run("successful auth with cookie", authTestFn(true, "auth", func(req *http.Request) {
+			req.AddCookie(accessTokenCookie)
+		}))
+
+		t.Run("successful auth with header", authTestFn(true, "auth-header", func(req *http.Request) {
+			req.Header.Set("authorization", "Bearer "+accessTokenCookie.Value)
+		}))
+
+		t.Run("successful auth with cookie when header is allowed too", authTestFn(true, "auth-header", func(req *http.Request) {
+			req.AddCookie(accessTokenCookie)
+		}))
+
+		t.Run("missing access token", authTestFn(false, "auth", nil))
+
+		t.Run("access token in header not allowed by route", authTestFn(false, "auth", func(req *http.Request) {
+			req.Header.Set("authorization", "Bearer "+accessTokenCookie.Value)
+		}))
+	})
 }
 
 func newTestServer(t *testing.T, wh *mockWebhook, httpClientTransport http.RoundTripper) (*Server, *bytes.Buffer, func()) {

@@ -25,6 +25,7 @@ type AccessTokenMiddlewareOpts struct {
 }
 
 // AccessTokenMiddleware is a middleware that requires the user to be authenticated and present a cookie with the access token for Azure Key Vault
+// Note that this middleware doesn't validate the access token in any way (not even making sure it's a valid JWT), it just ensures the token is present; it's Azure Key Vault's responsibility to validate the token
 // This injects the token in the request's context if it exists and it's valid
 func (s *Server) AccessTokenMiddleware(opts AccessTokenMiddlewareOpts) func(c *gin.Context) {
 	return func(c *gin.Context) {

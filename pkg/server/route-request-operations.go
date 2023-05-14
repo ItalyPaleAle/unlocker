@@ -30,7 +30,7 @@ import (
 func (s *Server) RouteRequestOperations(op requestOperation) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get the fields from the body
-		req := &subtleRequest{}
+		req := &operationRequest{}
 		err := c.Bind(req)
 		if err != nil {
 			_ = c.Error(err)
@@ -94,7 +94,7 @@ func (s *Server) RouteRequestOperations(op requestOperation) gin.HandlerFunc {
 	}
 }
 
-type subtleRequest struct {
+type operationRequest struct {
 	Vault      string `json:"vault" form:"vault"`
 	KeyId      string `json:"keyId" form:"keyId"`
 	KeyVersion string `json:"keyVersion" form:"keyVersion"`
@@ -125,7 +125,7 @@ var (
 )
 
 // Parse and validate the request object
-func (req *subtleRequest) Parse(op requestOperation) (err error) {
+func (req *operationRequest) Parse(op requestOperation) (err error) {
 	if req.Vault == "" {
 		return errors.New("missing parameter 'vault'")
 	}
@@ -232,7 +232,7 @@ func (req *subtleRequest) Parse(op requestOperation) (err error) {
 }
 
 // GetRequestState returns the requestState object from this request
-func (req *subtleRequest) GetRequestState(op requestOperation, requestor string) *requestState {
+func (req *operationRequest) GetRequestState(op requestOperation, requestor string) *requestState {
 	now := time.Now()
 	return &requestState{
 		Operation: op,
