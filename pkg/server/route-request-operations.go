@@ -95,20 +95,20 @@ func (s *Server) RouteRequestOperations(op requestOperation) gin.HandlerFunc {
 }
 
 type operationRequest struct {
-	Vault      string `json:"vault" form:"vault"`
-	KeyId      string `json:"keyId" form:"keyId"`
-	KeyVersion string `json:"keyVersion" form:"keyVersion"`
+	Vault      string `json:"vault,omitempty" form:"vault"`
+	KeyId      string `json:"keyId,omitempty" form:"keyId"`
+	KeyVersion string `json:"keyVersion,omitempty" form:"keyVersion"`
 
-	Algorithm      string `json:"algorithm" form:"algorithm"`
-	Value          string `json:"value" form:"value"`
-	Digest         string `json:"digest" form:"digest"`
-	Signature      string `json:"signature" form:"digest"`
-	AdditionalData string `json:"additionalData" form:"additionalData"`
-	Nonce          string `json:"nonce" form:"nonce"`
-	Tag            string `json:"tag" form:"tag"`
+	Algorithm      string `json:"algorithm,omitempty" form:"algorithm"`
+	Value          string `json:"value,omitempty" form:"value"`
+	Digest         string `json:"digest,omitempty" form:"digest"`
+	Signature      string `json:"signature,omitempty" form:"digest"`
+	AdditionalData string `json:"additionalData,omitempty" form:"additionalData"`
+	Nonce          string `json:"nonce,omitempty" form:"nonce"`
+	Tag            string `json:"tag,omitempty" form:"tag"`
 
-	Timeout any    `json:"timeout" form:"timeout"`
-	Note    string `json:"note" form:"note"`
+	Timeout any    `json:"timeout,omitempty" form:"timeout"`
+	Note    string `json:"note,omitempty" form:"note"`
 
 	timeoutDuration     time.Duration
 	valueBytes          []byte

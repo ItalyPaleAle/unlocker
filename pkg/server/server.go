@@ -370,8 +370,8 @@ func (s *Server) unsubscribeToState(stateId string, watch chan *requestState) {
 	ch := s.subs[stateId]
 	if ch != nil && ch == watch {
 		close(ch)
+		delete(s.subs, stateId)
 	}
-	delete(s.subs, stateId)
 }
 
 // Sends a notification to a state subscriber, if any

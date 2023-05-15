@@ -13,12 +13,14 @@ import (
 
 type apiListResponse []requestStatePublic
 
+const ndJSONContentType = "application/x-ndjson"
+
 // RouteApiListGet is the handler for the GET /api/list request
 // This returns the list of all pending requests
 // If the Accept header is `application/x-ndjson`, then this sends a stream of records, updated as soon as they come in, using the NDJSON format (https://github.com/ndjson/ndjson-spec)
 func (s *Server) RouteApiListGet(c *gin.Context) {
 	accept := c.GetHeader("accept")
-	if strings.ToLower(accept) == "application/x-ndjson" {
+	if strings.ToLower(accept) == ndJSONContentType {
 		s.routeApiListGetStream(c)
 	} else {
 		s.routeApiListGetSingle(c)
@@ -31,18 +33,16 @@ func (s *Server) routeApiListGetSingle(c *gin.Context) {
 
 	// Get the list of pending requests
 	s.lock.RLock()
-	if len(s.states) > 0 {
-		res = make([]requestStatePublic, len(s.states))
-		i := 0
-		for stateId, state := range s.states {
-			if state.Status != StatusPending || state.Processing || state.Expired() {
-				continue
-			}
-			res[i] = state.Public(stateId)
-			i++
+	res = make(apiListResponse, len(s.states))
+	i := 0
+	for stateId, state := range s.states {
+		if state.Status != StatusPending || state.Processing || state.Expired() {
+			continue
 		}
-		res = res[:i]
+		res[i] = state.Public(stateId)
+		i++
 	}
+	res = res[:i]
 	s.lock.RUnlock()
 
 	c.JSON(http.StatusOK, res)
@@ -67,7 +67,7 @@ func (s *Server) routeApiListGetStream(c *gin.Context) {
 	defer timeout.Stop()
 
 	// Send the content-type header and the status code, so we can start sending data over the stream
-	c.Header("content-type", "application/x-ndjson")
+	c.Header("content-type", ndJSONContentType)
 	c.Status(http.StatusOK)
 
 	// JSON stream encoder

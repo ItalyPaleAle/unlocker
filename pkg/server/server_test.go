@@ -9,6 +9,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"encoding/pem"
@@ -43,6 +44,8 @@ const (
 
 	// Size for the in-memory buffer for bufconn
 	bufconnBufSize = 1 << 20 // 1MB
+
+	jsonContentType = "application/json; charset=utf-8"
 )
 
 func TestMain(m *testing.M) {
@@ -397,8 +400,6 @@ func TestServerAppRoutes(t *testing.T) {
 				require.NoError(t, err)
 				defer closeBody(res)
 
-				fmt.Println(res.Header)
-
 				if success {
 					require.Equal(t, http.StatusNoContent, res.StatusCode)
 				} else {
@@ -424,6 +425,236 @@ func TestServerAppRoutes(t *testing.T) {
 		t.Run("access token in header not allowed by route", authTestFn(false, "auth", func(req *http.Request) {
 			req.Header.Set("authorization", "Bearer "+accessTokenCookie.Value)
 		}))
+
+		t.Run("missing Bearer prefix in header", authTestFn(false, "auth-header", func(req *http.Request) {
+			req.Header.Set("authorization", accessTokenCookie.Value)
+		}))
+	})
+
+	t.Run("Operations and APIs", func(t *testing.T) {
+		t.Run("List API returns no item", func(t *testing.T) {
+			reqCtx, reqCancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer reqCancel()
+			req, err := http.NewRequestWithContext(reqCtx, http.MethodGet,
+				fmt.Sprintf("https://localhost:%d/api/list", testServerPort), nil)
+			require.NoError(t, err)
+			req.AddCookie(accessTokenCookie)
+
+			res, err := appClient.Do(req)
+			require.NoError(t, err)
+			defer closeBody(res)
+
+			// Response should be an empty JSON array
+			require.Equal(t, http.StatusOK, res.StatusCode)
+			require.Equal(t, jsonContentType, res.Header.Get("content-type"))
+
+			body, err := io.ReadAll(res.Body)
+			require.NoError(t, err)
+			require.Equal(t, "[]", string(body))
+		})
+
+		listSubscribeCtx, listSubscribeCancel := context.WithCancel(context.Background())
+		defer listSubscribeCancel()
+		listSubscribeCh := make(chan *requestStatePublic)
+		t.Run("subscribe to list API stream", func(t *testing.T) {
+			req, err := http.NewRequestWithContext(listSubscribeCtx, http.MethodGet,
+				fmt.Sprintf("https://localhost:%d/api/list", testServerPort), nil)
+			require.NoError(t, err)
+			req.Header.Set("accept", ndJSONContentType)
+			req.AddCookie(accessTokenCookie)
+
+			res, err := appClient.Do(req)
+			require.NoError(t, err)
+			// Do not call defer closeBody(res) here because we want to continue reading from the stream after the test is done
+
+			require.Equal(t, http.StatusOK, res.StatusCode)
+			require.Equal(t, ndJSONContentType, res.Header.Get("content-type"))
+
+			go func() {
+				defer closeBody(res)
+
+				dec := json.NewDecoder(res.Body)
+				for {
+					var val requestStatePublic
+					decErr := dec.Decode(&val)
+					if decErr == nil {
+						listSubscribeCh <- &val
+					} else if errors.Is(decErr, io.EOF) || errors.Is(decErr, context.Canceled) {
+						break
+					} else {
+						panic("Unexpected error from list API stream: " + decErr.Error())
+					}
+				}
+				close(listSubscribeCh)
+			}()
+		})
+
+		// If the test failed at this stage, we need to abort
+		require.False(t, t.Failed(), "Cannot continue tests without a list subscription")
+
+		createRequestFn := func(resultFn func(stateID string)) func(t *testing.T) {
+			return func(t *testing.T) {
+				reqCtx, reqCancel := context.WithTimeout(context.Background(), 2*time.Second)
+				defer reqCancel()
+				reqBody, _ := json.Marshal(operationRequest{
+					Vault:     "testvault",
+					KeyId:     "testkey",
+					Algorithm: "RSA-OAEP",
+					Value:     base64.RawURLEncoding.EncodeToString([]byte("hello world")),
+				})
+				req, err := http.NewRequestWithContext(reqCtx, http.MethodPost,
+					fmt.Sprintf("https://localhost:%d/request/encrypt", testServerPort),
+					bytes.NewReader(reqBody),
+				)
+				require.NoError(t, err)
+				req.Header.Set("content-type", jsonContentType)
+
+				res, err := appClient.Do(req)
+				require.NoError(t, err)
+
+				// Response should contain the operation ID
+				require.Equal(t, http.StatusAccepted, res.StatusCode)
+				require.Equal(t, jsonContentType, res.Header.Get("content-type"))
+
+				resData := operationResponse{}
+				err = json.NewDecoder(res.Body).Decode(&resData)
+				require.NoError(t, err)
+				require.True(t, resData.Pending)
+				require.False(t, resData.Done)
+				require.False(t, resData.Failed)
+				require.NotEmpty(t, resData.State)
+
+				// The list channel should now receive the new request
+				select {
+				case <-time.After(time.Second):
+					t.Fatalf("Did not receive item in list within 1s: %s", resData.State)
+				case item := <-listSubscribeCh:
+					require.NotNil(t, item)
+					require.Equal(t, resData.State, item.State)
+					require.Equal(t, "pending", item.Status)
+					require.Equal(t, "encrypt", item.Operation)
+					require.Equal(t, "testvault", item.VaultName)
+					require.Equal(t, "testkey", item.KeyId)
+
+					// Request date should be approximately now or a few seconds ago
+					now := time.Now().Unix()
+					require.LessOrEqual(t, item.Date, now)
+					require.Greater(t, item.Date, now-5)
+
+					// Item should have the default expiration date
+					require.Equal(t, item.Date+int64(viper.GetDuration(config.KeyRequestTimeout).Seconds()), item.Expiry)
+				}
+
+				if resultFn != nil {
+					resultFn(resData.State)
+				}
+			}
+		}
+
+		var stateIDs [5]string
+		t.Run("Create 5 requests", func(t *testing.T) {
+			for i := 0; i < 5; i++ {
+				t.Run("request "+strconv.Itoa(i), createRequestFn(func(stateID string) {
+					stateIDs[i] = stateID
+				}))
+			}
+		})
+
+		t.Log("State IDs", stateIDs)
+
+		responsesCh := make(chan *struct {
+			state  string
+			status int
+			res    map[string]any
+			reqID  int
+		}, 2)
+		subscribeToResponseFn := func(t *testing.T, stateID string, reqID int) {
+			req, err := http.NewRequestWithContext(context.Background(), http.MethodGet,
+				fmt.Sprintf("https://localhost:%d/request/result/%s", testServerPort, stateID), nil)
+			require.NoError(t, err)
+			req.Header.Set("content-type", jsonContentType)
+
+			go func() {
+				res, err := appClient.Do(req)
+				if err != nil {
+					panic("Failed to make request: " + err.Error())
+				}
+				defer closeBody(res)
+
+				var resData map[string]any
+				err = json.NewDecoder(res.Body).Decode(&resData)
+				if err != nil {
+					panic("Failed to decode JSON response: " + err.Error())
+				}
+
+				responsesCh <- &struct {
+					state  string
+					status int
+					res    map[string]any
+					reqID  int
+				}{
+					state:  stateID,
+					status: res.StatusCode,
+					res:    resData,
+					reqID:  reqID,
+				}
+			}()
+		}
+		t.Run("subscribe to responses", func(t *testing.T) {
+			t.Run("subscribe to request 0", func(t *testing.T) {
+				subscribeToResponseFn(t, stateIDs[0], 0)
+			})
+
+			t.Run("subscribing to request multiple times", func(t *testing.T) {
+				// Subscribe to state ID 1; there should be no signal at this point
+				subscribeToResponseFn(t, stateIDs[1], 1)
+				select {
+				case <-time.After(750 * time.Millisecond):
+					// All good
+				case data := <-responsesCh:
+					t.Fatal("Received response when it was not expected", data)
+				}
+
+				// Subscribing to state ID 1 again should cause the first request to be interrupted
+				subscribeToResponseFn(t, stateIDs[1], 2)
+				select {
+				case <-time.After(750 * time.Millisecond):
+					t.Fatal("Did not receive a response in time")
+				case data := <-responsesCh:
+					require.Equal(t, 1, data.reqID)
+					require.Equal(t, http.StatusAccepted, data.status)
+					require.Equal(t, map[string]any{
+						"state":   stateIDs[1],
+						"pending": true,
+					}, data.res)
+				}
+
+				// Repeat
+				subscribeToResponseFn(t, stateIDs[1], 3)
+				select {
+				case <-time.After(750 * time.Millisecond):
+					t.Fatal("Did not receive a response in time")
+				case data := <-responsesCh:
+					require.Equal(t, 2, data.reqID)
+					require.Equal(t, http.StatusAccepted, data.status)
+					require.Equal(t, map[string]any{
+						"state":   stateIDs[1],
+						"pending": true,
+					}, data.res)
+				}
+			})
+		})
+
+		t.Run("stop list subscription", func(t *testing.T) {
+			// Canceling the context should stop the request
+			listSubscribeCancel()
+			select {
+			case <-time.After(time.Second):
+				t.Fatal("Did not receive signal within 1s")
+			case _, more := <-listSubscribeCh:
+				require.False(t, more)
+			}
+		})
 	})
 }
 
@@ -548,7 +779,7 @@ func assertResponseError(t *testing.T, res *http.Response, expectStatusCode int,
 	t.Helper()
 
 	require.Equal(t, expectStatusCode, res.StatusCode, "Response has an unexpected status code")
-	require.Equal(t, "application/json; charset=utf-8", res.Header.Get("content-type"), "Content-Type header is invalid")
+	require.Equal(t, jsonContentType, res.Header.Get("content-type"), "Content-Type header is invalid")
 
 	data := struct {
 		Error string `json:"error"`
