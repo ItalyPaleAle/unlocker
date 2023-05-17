@@ -51,6 +51,10 @@ type Server struct {
 	// These can be used for testing without having to start an actual TCP listener
 	appListener     net.Listener
 	metricsListener net.Listener
+
+	// Factory for keyvault.Client objects
+	// This is defined as a property to allow for mocking
+	kvClientFactory keyvault.ClientFactory
 }
 
 // NewServer creates a new Server object and initializes it
@@ -65,6 +69,8 @@ func NewServer(log *utils.AppLogger, webhook utils.Webhook) (*Server, error) {
 		httpClient: &http.Client{
 			Timeout: 15 * time.Second,
 		},
+
+		kvClientFactory: keyvault.NewClient,
 	}
 
 	// Init the object

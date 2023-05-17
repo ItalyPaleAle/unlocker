@@ -12,19 +12,37 @@ import (
 )
 
 // Client is a client for Azure Key Vault
-type Client struct {
-	cred tokenProvider
+type Client interface {
+	// Encrypt a message using a key stored in the Key Vault
+	Encrypt(ctx context.Context, vault, keyName, keyVersion string, params azkeys.KeyOperationsParameters) (*KeyVaultEncryptResponse, error)
+	// Decrypt a message using a key stored in the Key Vault.
+	Decrypt(ctx context.Context, vault, keyName, keyVersion string, params azkeys.KeyOperationsParameters) (*KeyVaultDecryptResponse, error)
+	// WrapKey wraps a key using the key-encryption-key stored in the Key Vault
+	WrapKey(ctx context.Context, vault, keyName, keyVersion string, params azkeys.KeyOperationsParameters) (*KeyVaultEncryptResponse, error)
+	// UnwrapKey unwrap a wrapped key using the key-encryption-key stored in the Key Vault
+	UnwrapKey(ctx context.Context, vault, keyName, keyVersion string, params azkeys.KeyOperationsParameters) (*KeyVaultDecryptResponse, error)
+	// Sign a message using a key stored in the Key Vault
+	Sign(ctx context.Context, vault, keyName, keyVersion string, params azkeys.SignParameters) (*KeyVaultSignResponse, error)
+	// Verify a signature using a key stored in the Key Vault
+	Verify(ctx context.Context, vault, keyName, keyVersion string, params azkeys.VerifyParameters) (*KeyVaultVerifyResponse, error)
 }
 
+// ClientFactory is the type for the NewClient function
+type ClientFactory func(accessToken string, expiration time.Time) Client
+
 // NewClient returns a new Client object
-func NewClient(accessToken string, expiration time.Time) *Client {
-	return &Client{
+func NewClient(accessToken string, expiration time.Time) Client {
+	return &client{
 		cred: newTokenProvider(accessToken, expiration),
 	}
 }
 
+type client struct {
+	cred tokenProvider
+}
+
 // Encrypt a message using a key stored in the Key Vault
-func (c *Client) Encrypt(ctx context.Context, vault, keyName, keyVersion string, params azkeys.KeyOperationsParameters) (*KeyVaultEncryptResponse, error) {
+func (c *client) Encrypt(ctx context.Context, vault, keyName, keyVersion string, params azkeys.KeyOperationsParameters) (*KeyVaultEncryptResponse, error) {
 	// Get the client
 	client, err := c.getClient(vault)
 	if err != nil {
@@ -51,7 +69,7 @@ func (c *Client) Encrypt(ctx context.Context, vault, keyName, keyVersion string,
 }
 
 // Decrypt a message using a key stored in the Key Vault.
-func (c *Client) Decrypt(ctx context.Context, vault, keyName, keyVersion string, params azkeys.KeyOperationsParameters) (*KeyVaultDecryptResponse, error) {
+func (c *client) Decrypt(ctx context.Context, vault, keyName, keyVersion string, params azkeys.KeyOperationsParameters) (*KeyVaultDecryptResponse, error) {
 	// Get the client
 	client, err := c.getClient(vault)
 	if err != nil {
@@ -76,7 +94,7 @@ func (c *Client) Decrypt(ctx context.Context, vault, keyName, keyVersion string,
 }
 
 // WrapKey wraps a key using the key-encryption-key stored in the Key Vault
-func (c *Client) WrapKey(ctx context.Context, vault, keyName, keyVersion string, params azkeys.KeyOperationsParameters) (*KeyVaultEncryptResponse, error) {
+func (c *client) WrapKey(ctx context.Context, vault, keyName, keyVersion string, params azkeys.KeyOperationsParameters) (*KeyVaultEncryptResponse, error) {
 	// Get the client
 	client, err := c.getClient(vault)
 	if err != nil {
@@ -103,7 +121,7 @@ func (c *Client) WrapKey(ctx context.Context, vault, keyName, keyVersion string,
 }
 
 // UnwrapKey unwrap a wrapped key using the key-encryption-key stored in the Key Vault
-func (c *Client) UnwrapKey(ctx context.Context, vault, keyName, keyVersion string, params azkeys.KeyOperationsParameters) (*KeyVaultDecryptResponse, error) {
+func (c *client) UnwrapKey(ctx context.Context, vault, keyName, keyVersion string, params azkeys.KeyOperationsParameters) (*KeyVaultDecryptResponse, error) {
 	// Get the client
 	client, err := c.getClient(vault)
 	if err != nil {
@@ -128,7 +146,7 @@ func (c *Client) UnwrapKey(ctx context.Context, vault, keyName, keyVersion strin
 }
 
 // Sign a message using a key stored in the Key Vault
-func (c *Client) Sign(ctx context.Context, vault, keyName, keyVersion string, params azkeys.SignParameters) (*KeyVaultSignResponse, error) {
+func (c *client) Sign(ctx context.Context, vault, keyName, keyVersion string, params azkeys.SignParameters) (*KeyVaultSignResponse, error) {
 	// Get the client
 	client, err := c.getClient(vault)
 	if err != nil {
@@ -153,7 +171,7 @@ func (c *Client) Sign(ctx context.Context, vault, keyName, keyVersion string, pa
 }
 
 // Verify a signature using a key stored in the Key Vault
-func (c *Client) Verify(ctx context.Context, vault, keyName, keyVersion string, params azkeys.VerifyParameters) (*KeyVaultVerifyResponse, error) {
+func (c *client) Verify(ctx context.Context, vault, keyName, keyVersion string, params azkeys.VerifyParameters) (*KeyVaultVerifyResponse, error) {
 	// Get the client
 	client, err := c.getClient(vault)
 	if err != nil {
@@ -183,7 +201,7 @@ func (c *Client) Verify(ctx context.Context, vault, keyName, keyVersion string, 
 // - The address of the vault, such as "https://<name>.vault.azure.net" (could be a different format if using different clouds or private endpoints)
 // - The FQDN of the vault, such as "<name>.vault.azure.net" (or another domain if using different clouds or private endpoints)
 // - Only the name of the vault, which will be formatted for "vault.azure.net"
-func (c Client) vaultUrl(vault string) string {
+func (c client) vaultUrl(vault string) string {
 	// If there's a dot, assume it's either a full URL or a FQDN
 	if strings.ContainsRune(vault, '.') {
 		if !strings.HasPrefix(vault, "https://") {
@@ -196,7 +214,7 @@ func (c Client) vaultUrl(vault string) string {
 }
 
 // getClient returns the azkeys.Client object for the given vault
-func (c *Client) getClient(vault string) (*azkeys.Client, error) {
+func (c *client) getClient(vault string) (*azkeys.Client, error) {
 	vaultUrl := c.vaultUrl(vault)
 
 	return azkeys.NewClient(vaultUrl, c.cred, &azkeys.ClientOptions{

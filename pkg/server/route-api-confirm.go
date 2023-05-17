@@ -111,7 +111,7 @@ func (s *Server) handleConfirm(c *gin.Context, stateId string, state *requestSta
 	start := time.Now()
 
 	// Init the Key Vault client
-	akv := keyvault.NewClient(at, expiration)
+	akv := s.kvClientFactory(at, expiration)
 
 	// Make the request
 	var (

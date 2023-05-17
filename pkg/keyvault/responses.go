@@ -8,9 +8,14 @@ type KeyVaultResponse interface {
 	KeyID() string
 }
 
-// Base for all responses, which includes the KeyID method.
+// Base for all responses, which includes the KeyID method
 type keyVaultResponseBase struct {
 	keyID string
+}
+
+// SetKeyID sets the key ID
+func (b *keyVaultResponseBase) SetKeyID(kid string) {
+	b.keyID = kid
 }
 
 // KeyID returns the key ID

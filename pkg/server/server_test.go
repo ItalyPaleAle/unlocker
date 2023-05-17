@@ -26,6 +26,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/Azure/azure-sdk-for-go/sdk/security/keyvault/azkeys"
 	"github.com/gin-gonic/gin"
 	"github.com/lestrrat-go/jwx/v2/jwk"
 	"github.com/spf13/viper"
@@ -33,6 +34,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/italypaleale/unlocker/pkg/config"
+	"github.com/italypaleale/unlocker/pkg/keyvault"
 	"github.com/italypaleale/unlocker/pkg/utils"
 	"github.com/italypaleale/unlocker/pkg/utils/bufconn"
 )
@@ -147,6 +149,11 @@ func TestServerAppRoutes(t *testing.T) {
 	stopServerFn := startTestServer(t, srv)
 	defer stopServerFn(t)
 	appClient := clientForListener(srv.appListener)
+
+	// Mock the Key Vault client
+	srv.kvClientFactory = func(accessToken string, expiration time.Time) keyvault.Client {
+		return &mockKVClient{}
+	}
 
 	// Add a route group for routes specific to some tests
 	testRoutes := srv.appRouter.Group("/_test")
@@ -726,13 +733,10 @@ func TestServerAppRoutes(t *testing.T) {
 		})
 
 		t.Run("Complete operations", func(t *testing.T) {
-			t.Run("Cancel operation 0", func(t *testing.T) {
-				reqCtx, reqCancel := context.WithTimeout(context.Background(), 2*time.Second)
-				defer reqCancel()
-				reqBody, _ := json.Marshal(&confirmRequest{
-					Cancel:  true,
-					StateId: stateIDs[0],
-				})
+			completeOperationFn := func(t *testing.T, reqCtx context.Context, reqData *confirmRequest) *http.Response {
+				t.Helper()
+
+				reqBody, _ := json.Marshal(reqData)
 				req, err := http.NewRequestWithContext(reqCtx, http.MethodPost,
 					fmt.Sprintf("https://localhost:%d/api/confirm", testServerPort),
 					bytes.NewReader(reqBody),
@@ -743,9 +747,65 @@ func TestServerAppRoutes(t *testing.T) {
 
 				res, err := appClient.Do(req)
 				require.NoError(t, err)
+
+				return res
+			}
+
+			t.Run("Cannot have both confirm and cancel", func(t *testing.T) {
+				reqCtx, reqCancel := context.WithTimeout(context.Background(), 2*time.Second)
+				defer reqCancel()
+				// False positive - body is closed
+				//nolint:bodyclose
+				res := completeOperationFn(t, reqCtx, &confirmRequest{
+					Cancel:  true,
+					Confirm: true,
+					StateId: stateIDs[0],
+				})
 				defer closeBody(res)
 
-				// Response should be a JSON object indicating cancelation
+				assertResponseError(t, res, http.StatusBadRequest, "One and only one of confirm and cancel must be set to true in the body")
+			})
+
+			t.Run("Operation not found", func(t *testing.T) {
+				reqCtx, reqCancel := context.WithTimeout(context.Background(), 2*time.Second)
+				defer reqCancel()
+				// False positive - body is closed
+				//nolint:bodyclose
+				res := completeOperationFn(t, reqCtx, &confirmRequest{
+					Confirm: true,
+					StateId: "not-found",
+				})
+				defer closeBody(res)
+
+				assertResponseError(t, res, http.StatusBadRequest, "State not found or expired")
+			})
+
+			t.Run("Operation has expired", func(t *testing.T) {
+				reqCtx, reqCancel := context.WithTimeout(context.Background(), 2*time.Second)
+				defer reqCancel()
+				// False positive - body is closed
+				//nolint:bodyclose
+				res := completeOperationFn(t, reqCtx, &confirmRequest{
+					Confirm: true,
+					StateId: stateIDs[5],
+				})
+				defer closeBody(res)
+
+				assertResponseError(t, res, http.StatusBadRequest, "State not found or expired")
+			})
+
+			t.Run("Cancel operation 0", func(t *testing.T) {
+				reqCtx, reqCancel := context.WithTimeout(context.Background(), 2*time.Second)
+				defer reqCancel()
+				// False positive - body is closed
+				//nolint:bodyclose
+				res := completeOperationFn(t, reqCtx, &confirmRequest{
+					Cancel:  true,
+					StateId: stateIDs[0],
+				})
+				defer closeBody(res)
+
+				// Response should be a JSON object indicating cancellation
 				require.Equal(t, http.StatusOK, res.StatusCode)
 				require.Equal(t, jsonContentType, res.Header.Get("content-type"))
 
@@ -773,6 +833,51 @@ func TestServerAppRoutes(t *testing.T) {
 				case item := <-listSubscribeCh:
 					require.NotNil(t, item)
 					require.Equal(t, stateIDs[0], item.State)
+					assert.Equal(t, "removed", item.Status)
+				}
+			})
+
+			t.Run("Confirm operation 1", func(t *testing.T) {
+				reqCtx, reqCancel := context.WithTimeout(context.Background(), 2*time.Second)
+				defer reqCancel()
+				res := completeOperationFn(t, reqCtx, &confirmRequest{
+					Confirm: true,
+					StateId: stateIDs[1],
+				})
+				defer closeBody(res)
+
+				// Response should be a JSON object indicating confirmation
+				require.Equal(t, http.StatusOK, res.StatusCode)
+				require.Equal(t, jsonContentType, res.Header.Get("content-type"))
+
+				body, err := io.ReadAll(res.Body)
+				require.NoError(t, err)
+				require.Equal(t, `{"confirmed":true}`, string(body))
+
+				// Should receive the result in responsesChs[0]
+				select {
+				case <-time.After(500 * time.Millisecond):
+					t.Fatal("Did not receive a response in time")
+				case data := <-responsesChs[1]:
+					// This was request 3
+					require.Equal(t, 3, data.reqID)
+					assert.Equal(t, http.StatusOK, data.status)
+					assert.Equal(t, map[string]any{
+						"done": true,
+						"response": map[string]any{
+							"data": base64.StdEncoding.EncodeToString([]byte("hello world")),
+						},
+						"state": stateIDs[1],
+					}, data.res)
+				}
+
+				// The list channel should receive the notification
+				select {
+				case <-time.After(500 * time.Millisecond):
+					t.Fatal("Did not receive updated item in list within 500ms")
+				case item := <-listSubscribeCh:
+					require.NotNil(t, item)
+					require.Equal(t, stateIDs[1], item.State)
 					assert.Equal(t, "removed", item.Status)
 				}
 			})
@@ -941,4 +1046,55 @@ func (w mockWebhook) SendWebhook(_ context.Context, data *utils.WebhookRequest) 
 func closeBody(res *http.Response) {
 	_, _ = io.Copy(io.Discard, res.Body)
 	res.Body.Close()
+}
+
+// mockKVClient implements the keyvault.Client interface
+type mockKVClient struct{}
+
+func (kv *mockKVClient) Encrypt(ctx context.Context, vault, keyName, keyVersion string, params azkeys.KeyOperationsParameters) (*keyvault.KeyVaultEncryptResponse, error) {
+	res := &keyvault.KeyVaultEncryptResponse{
+		Data: params.Value,
+	}
+	res.SetKeyID(keyName + "/" + keyVersion)
+	return res, nil
+}
+
+func (kv *mockKVClient) Decrypt(ctx context.Context, vault, keyName, keyVersion string, params azkeys.KeyOperationsParameters) (*keyvault.KeyVaultDecryptResponse, error) {
+	res := &keyvault.KeyVaultDecryptResponse{
+		Data: params.Value,
+	}
+	res.SetKeyID(keyName + "/" + keyVersion)
+	return res, nil
+}
+
+func (kv *mockKVClient) WrapKey(ctx context.Context, vault, keyName, keyVersion string, params azkeys.KeyOperationsParameters) (*keyvault.KeyVaultEncryptResponse, error) {
+	res := &keyvault.KeyVaultEncryptResponse{
+		Data: params.Value,
+	}
+	res.SetKeyID(keyName + "/" + keyVersion)
+	return res, nil
+}
+
+func (kv *mockKVClient) UnwrapKey(ctx context.Context, vault, keyName, keyVersion string, params azkeys.KeyOperationsParameters) (*keyvault.KeyVaultDecryptResponse, error) {
+	res := &keyvault.KeyVaultDecryptResponse{
+		Data: params.Value,
+	}
+	res.SetKeyID(keyName + "/" + keyVersion)
+	return res, nil
+}
+
+func (kv *mockKVClient) Sign(ctx context.Context, vault, keyName, keyVersion string, params azkeys.SignParameters) (*keyvault.KeyVaultSignResponse, error) {
+	res := &keyvault.KeyVaultSignResponse{
+		Data: params.Value,
+	}
+	res.SetKeyID(keyName + "/" + keyVersion)
+	return res, nil
+}
+
+func (kv *mockKVClient) Verify(ctx context.Context, vault, keyName, keyVersion string, params azkeys.VerifyParameters) (*keyvault.KeyVaultVerifyResponse, error) {
+	res := &keyvault.KeyVaultVerifyResponse{
+		Valid: true,
+	}
+	res.SetKeyID(keyName + "/" + keyVersion)
+	return res, nil
 }
