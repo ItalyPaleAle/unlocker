@@ -466,9 +466,10 @@ func TestServerAppRoutes(t *testing.T) {
 			req.Header.Set("accept", ndJSONContentType)
 			req.AddCookie(accessTokenCookie)
 
+			// Do not call defer closeBody(res) here because we want to continue reading from the stream after the test is done
+			//nolint:bodyclose
 			res, err := appClient.Do(req)
 			require.NoError(t, err)
-			// Do not call defer closeBody(res) here because we want to continue reading from the stream after the test is done
 
 			require.Equal(t, http.StatusOK, res.StatusCode)
 			require.Equal(t, ndJSONContentType, res.Header.Get("content-type"))
@@ -518,6 +519,7 @@ func TestServerAppRoutes(t *testing.T) {
 
 				res, err := appClient.Do(req)
 				require.NoError(t, err)
+				defer closeBody(res)
 
 				// Response should contain the operation ID
 				require.Equal(t, http.StatusAccepted, res.StatusCode)
@@ -741,6 +743,7 @@ func TestServerAppRoutes(t *testing.T) {
 
 				res, err := appClient.Do(req)
 				require.NoError(t, err)
+				defer closeBody(res)
 
 				// Response should be a JSON object indicating cancelation
 				require.Equal(t, http.StatusOK, res.StatusCode)
@@ -852,6 +855,7 @@ func startTestServer(t *testing.T, srv *Server) func(t *testing.T) {
 
 func clientForListener(ln net.Listener) *http.Client {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
+	//nolint:gosec
 	transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
 	transport.DialContext = func(ctx context.Context, _ string, _ string) (net.Conn, error) {
 		bl, ok := ln.(*bufconn.Listener)

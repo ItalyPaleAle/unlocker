@@ -29,11 +29,9 @@ func (s *Server) RouteApiListGet(c *gin.Context) {
 
 // Returns the response as a single JSON fragment
 func (s *Server) routeApiListGetSingle(c *gin.Context) {
-	res := apiListResponse{}
-
 	// Get the list of pending requests
 	s.lock.RLock()
-	res = make(apiListResponse, len(s.states))
+	res := make(apiListResponse, len(s.states))
 	i := 0
 	for stateId, state := range s.states {
 		if state.Status != StatusPending || state.Processing || state.Expired() {

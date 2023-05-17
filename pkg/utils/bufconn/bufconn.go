@@ -26,7 +26,7 @@ package bufconn
 
 import (
 	"context"
-	"fmt"
+	"errors"
 	"io"
 	"net"
 	"sync"
@@ -50,8 +50,10 @@ type netErrorTimeout struct {
 func (e netErrorTimeout) Timeout() bool   { return true }
 func (e netErrorTimeout) Temporary() bool { return false }
 
-var errClosed = fmt.Errorf("closed")
-var errTimeout net.Error = netErrorTimeout{error: fmt.Errorf("i/o timeout")}
+var (
+	errClosed            = errors.New("closed")
+	errTimeout net.Error = netErrorTimeout{error: errors.New("i/o timeout")}
+)
 
 // Listen returns a Listener that can only be contacted by its own Dialers and
 // creates buffered connections between the two.
@@ -274,8 +276,8 @@ func (c *conn) Close() error {
 }
 
 func (c *conn) SetDeadline(t time.Time) error {
-	c.SetReadDeadline(t)
-	c.SetWriteDeadline(t)
+	_ = c.SetReadDeadline(t)
+	_ = c.SetWriteDeadline(t)
 	return nil
 }
 
