@@ -313,8 +313,13 @@ func (c *conn) SetWriteDeadline(t time.Time) error {
 	return nil
 }
 
-func (*conn) LocalAddr() net.Addr  { return addr{} }
-func (*conn) RemoteAddr() net.Addr { return addr{} }
+func (*conn) LocalAddr() net.Addr { return addr{} }
+func (*conn) RemoteAddr() net.Addr {
+	return &net.TCPAddr{
+		IP:   net.IPv4(1, 2, 3, 4),
+		Port: 5678,
+	}
+}
 
 type addr struct{}
 

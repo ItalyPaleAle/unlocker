@@ -136,9 +136,12 @@ func TestServerAppRoutes(t *testing.T) {
 	// Create a roundtripper that captures the requests
 	rtt := &utils.RoundTripperTest{}
 
+	// Create a mock webhook
+	webhookRequests := make(chan *utils.WebhookRequest, 1)
+
 	// Create the server
 	// This will create in-memory listeners with bufconn too
-	srv, logBuf, cleanup := newTestServer(t, nil, rtt)
+	srv, logBuf, cleanup := newTestServer(t, &mockWebhook{requests: webhookRequests}, rtt)
 	require.NotNil(t, srv)
 	defer cleanup()
 	stopServerFn := startTestServer(t, srv)
@@ -456,7 +459,7 @@ func TestServerAppRoutes(t *testing.T) {
 		listSubscribeCtx, listSubscribeCancel := context.WithCancel(context.Background())
 		defer listSubscribeCancel()
 		listSubscribeCh := make(chan *requestStatePublic)
-		t.Run("subscribe to list API stream", func(t *testing.T) {
+		t.Run("Subscribe to list API stream", func(t *testing.T) {
 			req, err := http.NewRequestWithContext(listSubscribeCtx, http.MethodGet,
 				fmt.Sprintf("https://localhost:%d/api/list", testServerPort), nil)
 			require.NoError(t, err)
@@ -492,16 +495,20 @@ func TestServerAppRoutes(t *testing.T) {
 		// If the test failed at this stage, we need to abort
 		require.False(t, t.Failed(), "Cannot continue tests without a list subscription")
 
-		createRequestFn := func(resultFn func(stateID string)) func(t *testing.T) {
+		createRequestFn := func(reqDataFn func(*operationRequest), resultFn func(stateID string)) func(t *testing.T) {
 			return func(t *testing.T) {
 				reqCtx, reqCancel := context.WithTimeout(context.Background(), 2*time.Second)
 				defer reqCancel()
-				reqBody, _ := json.Marshal(operationRequest{
+				reqData := &operationRequest{
 					Vault:     "testvault",
 					KeyId:     "testkey",
 					Algorithm: "RSA-OAEP",
 					Value:     base64.RawURLEncoding.EncodeToString([]byte("hello world")),
-				})
+				}
+				if reqDataFn != nil {
+					reqDataFn(reqData)
+				}
+				reqBody, _ := json.Marshal(reqData)
 				req, err := http.NewRequestWithContext(reqCtx, http.MethodPost,
 					fmt.Sprintf("https://localhost:%d/request/encrypt", testServerPort),
 					bytes.NewReader(reqBody),
@@ -519,10 +526,10 @@ func TestServerAppRoutes(t *testing.T) {
 				resData := operationResponse{}
 				err = json.NewDecoder(res.Body).Decode(&resData)
 				require.NoError(t, err)
-				require.True(t, resData.Pending)
-				require.False(t, resData.Done)
-				require.False(t, resData.Failed)
-				require.NotEmpty(t, resData.State)
+				assert.True(t, resData.Pending)
+				assert.False(t, resData.Done)
+				assert.False(t, resData.Failed)
+				assert.NotEmpty(t, resData.State)
 
 				// The list channel should now receive the new request
 				select {
@@ -531,48 +538,88 @@ func TestServerAppRoutes(t *testing.T) {
 				case item := <-listSubscribeCh:
 					require.NotNil(t, item)
 					require.Equal(t, resData.State, item.State)
-					require.Equal(t, "pending", item.Status)
-					require.Equal(t, "encrypt", item.Operation)
-					require.Equal(t, "testvault", item.VaultName)
-					require.Equal(t, "testkey", item.KeyId)
+					assert.Equal(t, "pending", item.Status)
+					assert.Equal(t, "encrypt", item.Operation)
+					assert.Equal(t, "testvault", item.VaultName)
+					assert.Equal(t, "testkey", item.KeyId)
 
 					// Request date should be approximately now or a few seconds ago
 					now := time.Now().Unix()
-					require.LessOrEqual(t, item.Date, now)
-					require.Greater(t, item.Date, now-5)
+					assert.LessOrEqual(t, item.Date, now)
+					assert.Greater(t, item.Date, now-5)
 
-					// Item should have the default expiration date
-					require.Equal(t, item.Date+int64(viper.GetDuration(config.KeyRequestTimeout).Seconds()), item.Expiry)
+					// Item should have the correct expiration date
+					expectTimeoutSeconds := int64(viper.GetDuration(config.KeyRequestTimeout).Seconds())
+					if timeout, ok := reqData.Timeout.(string); ok && timeout != "" {
+						dur, err := time.ParseDuration(timeout)
+						require.NoError(t, err)
+						expectTimeoutSeconds = int64(dur.Seconds())
+					}
+					assert.Equal(t, item.Date+expectTimeoutSeconds, item.Expiry)
 				}
 
 				if resultFn != nil {
 					resultFn(resData.State)
 				}
+
+				// Webhook should have been invoked
+				select {
+				case <-time.After(100 * time.Millisecond):
+					t.Fatalf("Did not receive webhook before timeout: %s", resData.State)
+				case msg := <-webhookRequests:
+					require.NotNil(t, msg)
+					assert.Equal(t, resData.State, msg.StateId)
+					assert.Equal(t, "encrypt", msg.OperationName)
+					assert.Equal(t, reqData.Note, msg.Note)
+					assert.Equal(t, "testvault", msg.Vault)
+					assert.Equal(t, "testkey", msg.KeyId)
+					// IP of caller is always 1.2.3.4 in bufconn
+					assert.Equal(t, "1.2.3.4", msg.Requestor)
+				}
 			}
 		}
 
-		var stateIDs [5]string
+		var stateIDs [6]string
 		t.Run("Create 5 requests", func(t *testing.T) {
 			for i := 0; i < 5; i++ {
-				t.Run("request "+strconv.Itoa(i), createRequestFn(func(stateID string) {
+				t.Run("request "+strconv.Itoa(i), createRequestFn(nil, func(stateID string) {
 					stateIDs[i] = stateID
 				}))
 			}
 		})
 
+		t.Run("Create request that expires in 1s", createRequestFn(
+			func(or *operationRequest) {
+				// Minimum is 1s
+				or.Timeout = "1s"
+			},
+			func(stateID string) {
+				stateIDs[5] = stateID
+			},
+		))
+
 		t.Log("State IDs", stateIDs)
 
-		responsesCh := make(chan *struct {
+		var responsesChs [6]chan *struct {
 			state  string
 			status int
 			res    map[string]any
 			reqID  int
-		}, 2)
-		subscribeToResponseFn := func(t *testing.T, stateID string, reqID int) {
+		}
+		subscribeToResponseFn := func(t *testing.T, stateID int, reqID int) {
 			req, err := http.NewRequestWithContext(context.Background(), http.MethodGet,
-				fmt.Sprintf("https://localhost:%d/request/result/%s", testServerPort, stateID), nil)
+				fmt.Sprintf("https://localhost:%d/request/result/%s", testServerPort, stateIDs[stateID]), nil)
 			require.NoError(t, err)
 			req.Header.Set("content-type", jsonContentType)
+
+			if responsesChs[stateID] == nil {
+				responsesChs[stateID] = make(chan *struct {
+					state  string
+					status int
+					res    map[string]any
+					reqID  int
+				}, 1)
+			}
 
 			go func() {
 				res, err := appClient.Do(req)
@@ -587,65 +634,148 @@ func TestServerAppRoutes(t *testing.T) {
 					panic("Failed to decode JSON response: " + err.Error())
 				}
 
-				responsesCh <- &struct {
+				responsesChs[stateID] <- &struct {
 					state  string
 					status int
 					res    map[string]any
 					reqID  int
 				}{
-					state:  stateID,
+					state:  stateIDs[stateID],
 					status: res.StatusCode,
 					res:    resData,
 					reqID:  reqID,
 				}
 			}()
 		}
-		t.Run("subscribe to responses", func(t *testing.T) {
-			t.Run("subscribe to request 0", func(t *testing.T) {
-				subscribeToResponseFn(t, stateIDs[0], 0)
+
+		t.Run("Subscribe to responses", func(t *testing.T) {
+			t.Run("Subscribe to request 0", func(t *testing.T) {
+				subscribeToResponseFn(t, 0, 0)
 			})
 
-			t.Run("subscribing to request multiple times", func(t *testing.T) {
+			t.Run("Subscribe to request 1 multiple times", func(t *testing.T) {
 				// Subscribe to state ID 1; there should be no signal at this point
-				subscribeToResponseFn(t, stateIDs[1], 1)
+				subscribeToResponseFn(t, 1, 1)
 				select {
 				case <-time.After(750 * time.Millisecond):
 					// All good
-				case data := <-responsesCh:
+				case data := <-responsesChs[1]:
 					t.Fatal("Received response when it was not expected", data)
 				}
 
 				// Subscribing to state ID 1 again should cause the first request to be interrupted
-				subscribeToResponseFn(t, stateIDs[1], 2)
+				subscribeToResponseFn(t, 1, 2)
 				select {
 				case <-time.After(750 * time.Millisecond):
 					t.Fatal("Did not receive a response in time")
-				case data := <-responsesCh:
+				case data := <-responsesChs[1]:
 					require.Equal(t, 1, data.reqID)
-					require.Equal(t, http.StatusAccepted, data.status)
-					require.Equal(t, map[string]any{
+					assert.Equal(t, http.StatusAccepted, data.status)
+					assert.Equal(t, map[string]any{
 						"state":   stateIDs[1],
 						"pending": true,
 					}, data.res)
 				}
 
 				// Repeat
-				subscribeToResponseFn(t, stateIDs[1], 3)
+				subscribeToResponseFn(t, 1, 3)
 				select {
 				case <-time.After(750 * time.Millisecond):
 					t.Fatal("Did not receive a response in time")
-				case data := <-responsesCh:
+				case data := <-responsesChs[1]:
 					require.Equal(t, 2, data.reqID)
-					require.Equal(t, http.StatusAccepted, data.status)
-					require.Equal(t, map[string]any{
+					assert.Equal(t, http.StatusAccepted, data.status)
+					assert.Equal(t, map[string]any{
 						"state":   stateIDs[1],
 						"pending": true,
 					}, data.res)
 				}
 			})
+
+			t.Run("Subscribe to request 5", func(t *testing.T) {
+				subscribeToResponseFn(t, 5, 100)
+			})
 		})
 
-		t.Run("stop list subscription", func(t *testing.T) {
+		t.Run("Request 5 should expire", func(t *testing.T) {
+			// Should expire
+			select {
+			// This gives it 1.5 seconds because the request expires after 1s
+			case <-time.After(1500 * time.Millisecond):
+				t.Fatal("Did not receive a response in time")
+			case data := <-responsesChs[5]:
+				require.Equal(t, 100, data.reqID)
+				assert.Equal(t, http.StatusConflict, data.status)
+				assert.Equal(t, map[string]any{
+					"state":  stateIDs[5],
+					"failed": true,
+				}, data.res)
+			}
+
+			// The list channel should receive the notification
+			select {
+			case <-time.After(500 * time.Millisecond):
+				t.Fatal("Did not receive updated item in list within 500ms")
+			case item := <-listSubscribeCh:
+				require.NotNil(t, item)
+				require.Equal(t, stateIDs[5], item.State)
+				assert.Equal(t, "removed", item.Status)
+			}
+		})
+
+		t.Run("Complete operations", func(t *testing.T) {
+			t.Run("Cancel operation 0", func(t *testing.T) {
+				reqCtx, reqCancel := context.WithTimeout(context.Background(), 2*time.Second)
+				defer reqCancel()
+				reqBody, _ := json.Marshal(&confirmRequest{
+					Cancel:  true,
+					StateId: stateIDs[0],
+				})
+				req, err := http.NewRequestWithContext(reqCtx, http.MethodPost,
+					fmt.Sprintf("https://localhost:%d/api/confirm", testServerPort),
+					bytes.NewReader(reqBody),
+				)
+				require.NoError(t, err)
+				req.AddCookie(accessTokenCookie)
+				req.Header.Set("content-type", jsonContentType)
+
+				res, err := appClient.Do(req)
+				require.NoError(t, err)
+
+				// Response should be a JSON object indicating cancelation
+				require.Equal(t, http.StatusOK, res.StatusCode)
+				require.Equal(t, jsonContentType, res.Header.Get("content-type"))
+
+				body, err := io.ReadAll(res.Body)
+				require.NoError(t, err)
+				require.Equal(t, `{"canceled":true}`, string(body))
+
+				// Should receive the result in responsesChs[0]
+				select {
+				case <-time.After(500 * time.Millisecond):
+					t.Fatal("Did not receive a response in time")
+				case data := <-responsesChs[0]:
+					require.Equal(t, 0, data.reqID)
+					assert.Equal(t, http.StatusConflict, data.status)
+					assert.Equal(t, map[string]any{
+						"state":  stateIDs[0],
+						"failed": true,
+					}, data.res)
+				}
+
+				// The list channel should receive the notification
+				select {
+				case <-time.After(500 * time.Millisecond):
+					t.Fatal("Did not receive updated item in list within 500ms")
+				case item := <-listSubscribeCh:
+					require.NotNil(t, item)
+					require.Equal(t, stateIDs[0], item.State)
+					assert.Equal(t, "removed", item.Status)
+				}
+			})
+		})
+
+		t.Run("Stop list subscription", func(t *testing.T) {
 			// Canceling the context should stop the request
 			listSubscribeCancel()
 			select {
