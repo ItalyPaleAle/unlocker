@@ -105,6 +105,17 @@ jobs:
           version: latest
           install: true
 
+      - name: Run golangci-Lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: v1.52.2
+
+      - name: Run tests
+        run: |
+          go test -v \
+            -tags unit \
+            ./... 
+
       - name: Build for all platforms
         run: |
           mkdir -p .bin .out
