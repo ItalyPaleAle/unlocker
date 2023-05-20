@@ -10,8 +10,8 @@ import (
 	"github.com/spf13/viper"
 	"github.com/stretchr/testify/require"
 
-	"github.com/italypaleale/unlocker/pkg/config"
-	"github.com/italypaleale/unlocker/pkg/utils"
+	"github.com/italypaleale/revaulter/pkg/config"
+	"github.com/italypaleale/revaulter/pkg/utils"
 )
 
 func TestValidateConfig(t *testing.T) {

@@ -13,10 +13,10 @@ import (
 	"github.com/lestrrat-go/jwx/v2/jwt"
 	"github.com/spf13/viper"
 
-	"github.com/italypaleale/unlocker/pkg/config"
+	"github.com/italypaleale/revaulter/pkg/config"
 )
 
-const jwtIssuer = "unlocker"
+const jwtIssuer = "revaulter"
 
 func getSecureCookie(c *gin.Context, name string) (plaintextValue string, ttl time.Duration, err error) {
 	cek, ok := viper.Get(config.KeyInternalCookieEncryptionKey).(jwk.Key)

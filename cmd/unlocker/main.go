@@ -9,8 +9,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 
-	"github.com/italypaleale/unlocker/pkg/server"
-	"github.com/italypaleale/unlocker/pkg/utils"
+	"github.com/italypaleale/revaulter/pkg/server"
+	"github.com/italypaleale/revaulter/pkg/utils"
 )
 
 var appLogger *utils.AppLogger
@@ -20,7 +20,7 @@ func main() {
 	gin.SetMode(gin.ReleaseMode)
 
 	// Init the app logger object
-	appLogger = utils.NewAppLogger("unlocker", os.Stderr)
+	appLogger = utils.NewAppLogger("revaulter", os.Stderr)
 
 	// Load config
 	err := loadConfig()

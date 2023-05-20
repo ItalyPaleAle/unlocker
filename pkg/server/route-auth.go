@@ -18,7 +18,7 @@ import (
 	"github.com/spf13/viper"
 	"golang.org/x/text/unicode/norm"
 
-	"github.com/italypaleale/unlocker/pkg/config"
+	"github.com/italypaleale/revaulter/pkg/config"
 )
 
 const (

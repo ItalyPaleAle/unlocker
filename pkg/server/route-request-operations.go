@@ -15,9 +15,9 @@ import (
 	"github.com/spf13/cast"
 	"github.com/spf13/viper"
 
-	"github.com/italypaleale/unlocker/pkg/config"
-	"github.com/italypaleale/unlocker/pkg/keyvault"
-	"github.com/italypaleale/unlocker/pkg/utils"
+	"github.com/italypaleale/revaulter/pkg/config"
+	"github.com/italypaleale/revaulter/pkg/keyvault"
+	"github.com/italypaleale/revaulter/pkg/utils"
 )
 
 // RouteRequestOperations is the handler for the routes that perform operations:

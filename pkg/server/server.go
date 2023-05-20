@@ -19,10 +19,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
 
-	"github.com/italypaleale/unlocker/pkg/config"
-	"github.com/italypaleale/unlocker/pkg/keyvault"
-	"github.com/italypaleale/unlocker/pkg/metrics"
-	"github.com/italypaleale/unlocker/pkg/utils"
+	"github.com/italypaleale/revaulter/pkg/config"
+	"github.com/italypaleale/revaulter/pkg/keyvault"
+	"github.com/italypaleale/revaulter/pkg/metrics"
+	"github.com/italypaleale/revaulter/pkg/utils"
 )
 
 // Server is the server based on Gin
@@ -33,7 +33,7 @@ type Server struct {
 	states     map[string]*requestState
 	lock       sync.RWMutex
 	webhook    utils.Webhook
-	metrics    metrics.UnlockerMetrics
+	metrics    metrics.RevaulterMetrics
 	// Subscribers that receive public events
 	pubsub *utils.Broker[*requestStatePublic]
 	// Subscriptions to watch for state changes

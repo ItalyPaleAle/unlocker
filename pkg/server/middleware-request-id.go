@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/spf13/viper"
 
-	"github.com/italypaleale/unlocker/pkg/config"
+	"github.com/italypaleale/revaulter/pkg/config"
 )
 
 // RequestIdMiddleware is a middleware that generates a unique request ID for each request

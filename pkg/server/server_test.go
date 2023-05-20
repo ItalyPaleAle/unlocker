@@ -33,10 +33,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/italypaleale/unlocker/pkg/config"
-	"github.com/italypaleale/unlocker/pkg/keyvault"
-	"github.com/italypaleale/unlocker/pkg/utils"
-	"github.com/italypaleale/unlocker/pkg/utils/bufconn"
+	"github.com/italypaleale/revaulter/pkg/config"
+	"github.com/italypaleale/revaulter/pkg/keyvault"
+	"github.com/italypaleale/revaulter/pkg/utils"
+	"github.com/italypaleale/revaulter/pkg/utils/bufconn"
 )
 
 const (

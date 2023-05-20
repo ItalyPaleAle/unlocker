@@ -9,7 +9,7 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore"
 	"github.com/gin-gonic/gin"
 
-	"github.com/italypaleale/unlocker/pkg/keyvault"
+	"github.com/italypaleale/revaulter/pkg/keyvault"
 )
 
 // RouteApiConfirmPost is the handler for the POST /api/confirm request

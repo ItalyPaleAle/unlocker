@@ -14,8 +14,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/spf13/viper"
 
-	"github.com/italypaleale/unlocker/client"
-	"github.com/italypaleale/unlocker/pkg/config"
+	"github.com/italypaleale/revaulter/client"
+	"github.com/italypaleale/revaulter/pkg/config"
 )
 
 //go:generate ../../client/build.sh

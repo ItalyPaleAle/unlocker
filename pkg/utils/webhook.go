@@ -14,7 +14,7 @@ import (
 	"github.com/spf13/viper"
 	kclock "k8s.io/utils/clock"
 
-	"github.com/italypaleale/unlocker/pkg/config"
+	"github.com/italypaleale/revaulter/pkg/config"
 )
 
 const webhookTimeout = 20 * time.Second

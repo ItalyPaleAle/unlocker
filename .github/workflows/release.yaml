@@ -20,7 +20,7 @@ env:
 jobs:
 
   build:
-    name: Build
+    name: Build and release
     runs-on: ubuntu-22.04
     env:
       CGO_ENABLED: "0"
@@ -127,89 +127,89 @@ jobs:
           go generate -v ./...
 
           echo -e "\n###\nSetting BUILD_LDFLAGS\n"
-          BUILDINFO_PKG="github.com/italypaleale/unlocker/pkg/buildinfo"
+          BUILDINFO_PKG="github.com/italypaleale/revaulter/pkg/buildinfo"
           BUILD_LDFLAGS="-X ${BUILDINFO_PKG}.Production=1 -X ${BUILDINFO_PKG}.AppVersion=${{env.BUILD_VERSION}} -X ${BUILDINFO_PKG}.BuildId=${{env.BUILD_ID}} -X ${BUILDINFO_PKG}.BuildDate=${{env.BUILD_DATE}} -X ${BUILDINFO_PKG}.CommitHash=${{env.COMMIT_HASH}}"
           echo "BUILD_LDFLAGS=${BUILD_LDFLAGS}"
 
           echo -e "\n###\nBuilding linux/amd64\n"
-          mkdir .bin/unlocker-${{ env.BUILD_ID }}-linux-amd64
+          mkdir .bin/revaulter-${{ env.BUILD_ID }}-linux-amd64
           GOOS=linux \
           GOARCH=amd64 \
             go build \
               -ldflags "${BUILD_LDFLAGS}" \
-              -o .bin/unlocker-${{ env.BUILD_ID }}-linux-amd64/unlocker \
-              ./cmd/unlocker
-          cp LICENSE.md .bin/unlocker-${{ env.BUILD_ID }}-linux-amd64
-          cp README.md .bin/unlocker-${{ env.BUILD_ID }}-linux-amd64
-          (cd .bin && tar -czvf ../.out/unlocker-${{ env.BUILD_ID }}-linux-amd64.tar.gz unlocker-${{ env.BUILD_ID }}-linux-amd64)
+              -o .bin/revaulter-${{ env.BUILD_ID }}-linux-amd64/revaulter \
+              ./cmd/revaulter
+          cp LICENSE.md .bin/revaulter-${{ env.BUILD_ID }}-linux-amd64
+          cp README.md .bin/revaulter-${{ env.BUILD_ID }}-linux-amd64
+          (cd .bin && tar -czvf ../.out/revaulter-${{ env.BUILD_ID }}-linux-amd64.tar.gz revaulter-${{ env.BUILD_ID }}-linux-amd64)
 
           echo -e "\n###\nBuilding linux/386\n"
-          mkdir .bin/unlocker-${{ env.BUILD_ID }}-linux-386
+          mkdir .bin/revaulter-${{ env.BUILD_ID }}-linux-386
           GOOS=linux \
           GOARCH=386 \
             go build \
               -ldflags "${BUILD_LDFLAGS}" \
-              -o .bin/unlocker-${{ env.BUILD_ID }}-linux-386/unlocker \
-              ./cmd/unlocker
-          cp LICENSE.md .bin/unlocker-${{ env.BUILD_ID }}-linux-386
-          cp README.md .bin/unlocker-${{ env.BUILD_ID }}-linux-386
-          (cd .bin && tar -czvf ../.out/unlocker-${{ env.BUILD_ID }}-linux-386.tar.gz unlocker-${{ env.BUILD_ID }}-linux-386)
+              -o .bin/revaulter-${{ env.BUILD_ID }}-linux-386/revaulter \
+              ./cmd/revaulter
+          cp LICENSE.md .bin/revaulter-${{ env.BUILD_ID }}-linux-386
+          cp README.md .bin/revaulter-${{ env.BUILD_ID }}-linux-386
+          (cd .bin && tar -czvf ../.out/revaulter-${{ env.BUILD_ID }}-linux-386.tar.gz revaulter-${{ env.BUILD_ID }}-linux-386)
 
           echo -e "\n###\nBuilding linux/arm64\n"
-          mkdir .bin/unlocker-${{ env.BUILD_ID }}-linux-arm64
+          mkdir .bin/revaulter-${{ env.BUILD_ID }}-linux-arm64
           GOOS=linux \
           GOARCH=arm64 \
             go build \
               -ldflags "${BUILD_LDFLAGS}" \
-              -o .bin/unlocker-${{ env.BUILD_ID }}-linux-arm64/unlocker \
-              ./cmd/unlocker
-          cp LICENSE.md .bin/unlocker-${{ env.BUILD_ID }}-linux-arm64
-          cp README.md .bin/unlocker-${{ env.BUILD_ID }}-linux-arm64
-          (cd .bin && tar -czvf ../.out/unlocker-${{ env.BUILD_ID }}-linux-arm64.tar.gz unlocker-${{ env.BUILD_ID }}-linux-arm64)
+              -o .bin/revaulter-${{ env.BUILD_ID }}-linux-arm64/revaulter \
+              ./cmd/revaulter
+          cp LICENSE.md .bin/revaulter-${{ env.BUILD_ID }}-linux-arm64
+          cp README.md .bin/revaulter-${{ env.BUILD_ID }}-linux-arm64
+          (cd .bin && tar -czvf ../.out/revaulter-${{ env.BUILD_ID }}-linux-arm64.tar.gz revaulter-${{ env.BUILD_ID }}-linux-arm64)
 
           echo -e "\n###\nBuilding linux/armv7\n"
-          mkdir .bin/unlocker-${{ env.BUILD_ID }}-linux-armv7
+          mkdir .bin/revaulter-${{ env.BUILD_ID }}-linux-armv7
           GOOS=linux \
           GOARCH=arm \
           GOARM=7 \
             go build \
               -ldflags "${BUILD_LDFLAGS}" \
-              -o .bin/unlocker-${{ env.BUILD_ID }}-linux-armv7/unlocker \
-              ./cmd/unlocker
-          cp LICENSE.md .bin/unlocker-${{ env.BUILD_ID }}-linux-armv7
-          cp README.md .bin/unlocker-${{ env.BUILD_ID }}-linux-armv7
-          (cd .bin && tar -czvf ../.out/unlocker-${{ env.BUILD_ID }}-linux-armv7.tar.gz unlocker-${{ env.BUILD_ID }}-linux-armv7)
+              -o .bin/revaulter-${{ env.BUILD_ID }}-linux-armv7/revaulter \
+              ./cmd/revaulter
+          cp LICENSE.md .bin/revaulter-${{ env.BUILD_ID }}-linux-armv7
+          cp README.md .bin/revaulter-${{ env.BUILD_ID }}-linux-armv7
+          (cd .bin && tar -czvf ../.out/revaulter-${{ env.BUILD_ID }}-linux-armv7.tar.gz revaulter-${{ env.BUILD_ID }}-linux-armv7)
 
           echo -e "\n###\nBuilding darwin/amd64\n"
-          mkdir .bin/unlocker-${{ env.BUILD_ID }}-macos
+          mkdir .bin/revaulter-${{ env.BUILD_ID }}-macos
           GOOS=darwin \
           GOARCH=amd64 \
             go build \
               -ldflags "${BUILD_LDFLAGS}" \
-              -o .bin/unlocker-${{ env.BUILD_ID }}-macos-x64/unlocker \
-              ./cmd/unlocker
-          cp LICENSE.md .bin/unlocker-${{ env.BUILD_ID }}-macos-x64
-          cp README.md .bin/unlocker-${{ env.BUILD_ID }}-macos-x64
-          (cd .bin && tar -czvf ../.out/unlocker-${{ env.BUILD_ID }}-macos-x64.tar.gz unlocker-${{ env.BUILD_ID }}-macos-x64)
+              -o .bin/revaulter-${{ env.BUILD_ID }}-macos-x64/revaulter \
+              ./cmd/revaulter
+          cp LICENSE.md .bin/revaulter-${{ env.BUILD_ID }}-macos-x64
+          cp README.md .bin/revaulter-${{ env.BUILD_ID }}-macos-x64
+          (cd .bin && tar -czvf ../.out/revaulter-${{ env.BUILD_ID }}-macos-x64.tar.gz revaulter-${{ env.BUILD_ID }}-macos-x64)
 
           echo -e "\n###\nBuilding darwin/arm64\n"
-          mkdir .bin/unlocker-${{ env.BUILD_ID }}-macos-arm64
+          mkdir .bin/revaulter-${{ env.BUILD_ID }}-macos-arm64
           GOOS=darwin \
           GOARCH=arm64 \
             go build \
               -ldflags "${BUILD_LDFLAGS}" \
-              -o .bin/unlocker-${{ env.BUILD_ID }}-macos-arm64/unlocker \
-              ./cmd/unlocker
-          cp LICENSE.md .bin/unlocker-${{ env.BUILD_ID }}-macos-arm64
-          cp README.md .bin/unlocker-${{ env.BUILD_ID }}-macos-arm64
-          (cd .bin && tar -czvf ../.out/unlocker-${{ env.BUILD_ID }}-macos-arm64.tar.gz unlocker-${{ env.BUILD_ID }}-macos-arm64)
+              -o .bin/revaulter-${{ env.BUILD_ID }}-macos-arm64/revaulter \
+              ./cmd/revaulter
+          cp LICENSE.md .bin/revaulter-${{ env.BUILD_ID }}-macos-arm64
+          cp README.md .bin/revaulter-${{ env.BUILD_ID }}-macos-arm64
+          (cd .bin && tar -czvf ../.out/revaulter-${{ env.BUILD_ID }}-macos-arm64.tar.gz revaulter-${{ env.BUILD_ID }}-macos-arm64)
 
           echo -e "\n###\nLinks for Docker buildx\n"
           (
             cd .bin && \
-            ln -v -s unlocker-${{ env.BUILD_ID }}-linux-amd64 linux-amd64 && \
-            ln -v -s unlocker-${{ env.BUILD_ID }}-linux-arm64 linux-arm64 && \
-            ln -v -s unlocker-${{ env.BUILD_ID }}-linux-armv7 linux-arm \
+            ln -v -s revaulter-${{ env.BUILD_ID }}-linux-amd64 linux-amd64 && \
+            ln -v -s revaulter-${{ env.BUILD_ID }}-linux-arm64 linux-arm64 && \
+            ln -v -s revaulter-${{ env.BUILD_ID }}-linux-armv7 linux-arm \
           )
 
           echo -e "\n###\nCompilation done\n"
@@ -236,70 +236,70 @@ jobs:
           draft: true
           prerelease: ${{ env.PRERELEASE != '' }}
 
-      - name: Upload release asset unlocker-linux-amd64
+      - name: Upload release asset revaulter-linux-amd64
         uses: actions/upload-release-asset@v1
         if: env.BUILD_VERSION != 'edge'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: .out/unlocker-${{ env.BUILD_ID }}-linux-amd64.tar.gz
-          asset_name: unlocker-${{ env.BUILD_ID }}-linux-amd64.tar.gz
+          asset_path: .out/revaulter-${{ env.BUILD_ID }}-linux-amd64.tar.gz
+          asset_name: revaulter-${{ env.BUILD_ID }}-linux-amd64.tar.gz
           asset_content_type: application/gzip
 
-      - name: Upload release asset unlocker-linux-386
+      - name: Upload release asset revaulter-linux-386
         uses: actions/upload-release-asset@v1
         if: env.BUILD_VERSION != 'edge'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: .out/unlocker-${{ env.BUILD_ID }}-linux-386.tar.gz
-          asset_name: unlocker-${{ env.BUILD_ID }}-linux-386.tar.gz
+          asset_path: .out/revaulter-${{ env.BUILD_ID }}-linux-386.tar.gz
+          asset_name: revaulter-${{ env.BUILD_ID }}-linux-386.tar.gz
           asset_content_type: application/gzip
 
-      - name: Upload release asset unlocker-linux-arm64
+      - name: Upload release asset revaulter-linux-arm64
         uses: actions/upload-release-asset@v1
         if: env.BUILD_VERSION != 'edge'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: .out/unlocker-${{ env.BUILD_ID }}-linux-arm64.tar.gz
-          asset_name: unlocker-${{ env.BUILD_ID }}-linux-arm64.tar.gz
+          asset_path: .out/revaulter-${{ env.BUILD_ID }}-linux-arm64.tar.gz
+          asset_name: revaulter-${{ env.BUILD_ID }}-linux-arm64.tar.gz
           asset_content_type: application/gzip
 
-      - name: Upload release asset unlocker-linux-armv7
+      - name: Upload release asset revaulter-linux-armv7
         uses: actions/upload-release-asset@v1
         if: env.BUILD_VERSION != 'edge'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: .out/unlocker-${{ env.BUILD_ID }}-linux-armv7.tar.gz
-          asset_name: unlocker-${{ env.BUILD_ID }}-linux-armv7.tar.gz
+          asset_path: .out/revaulter-${{ env.BUILD_ID }}-linux-armv7.tar.gz
+          asset_name: revaulter-${{ env.BUILD_ID }}-linux-armv7.tar.gz
           asset_content_type: application/gzip
 
-      - name: Upload release asset unlocker-macos-x64
+      - name: Upload release asset revaulter-macos-x64
         uses: actions/upload-release-asset@v1
         if: env.BUILD_VERSION != 'edge'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: .out/unlocker-${{ env.BUILD_ID }}-macos-x64.tar.gz
-          asset_name: unlocker-${{ env.BUILD_ID }}-macos-x64.tar.gz
+          asset_path: .out/revaulter-${{ env.BUILD_ID }}-macos-x64.tar.gz
+          asset_name: revaulter-${{ env.BUILD_ID }}-macos-x64.tar.gz
           asset_content_type: application/gzip
 
-      - name: Upload release asset unlocker-macos-arm64
+      - name: Upload release asset revaulter-macos-arm64
         uses: actions/upload-release-asset@v1
         if: env.BUILD_VERSION != 'edge'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: .out/unlocker-${{ env.BUILD_ID }}-macos-arm64.tar.gz
-          asset_name: unlocker-${{ env.BUILD_ID }}-macos-arm64.tar.gz
+          asset_path: .out/revaulter-${{ env.BUILD_ID }}-macos-arm64.tar.gz
+          asset_name: revaulter-${{ env.BUILD_ID }}-macos-arm64.tar.gz
           asset_content_type: application/gzip
 
       - name: Set variable REPO_OWNER
@@ -317,8 +317,8 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           tags: |
-            ghcr.io/${{ env.REPO_OWNER }}/unlocker:edge
-            ghcr.io/${{ env.REPO_OWNER }}/unlocker:edge
+            ghcr.io/${{ env.REPO_OWNER }}/revaulter:edge
+            ghcr.io/${{ env.REPO_OWNER }}/revaulter:edge
           push: true
 
       - name: Docker build and push to Docker Hub - edge
@@ -329,8 +329,8 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           tags: |
-            ${{ env.DOCKERHUB_USERNAME }}/unlocker:edge
-            ${{ env.DOCKERHUB_USERNAME }}/unlocker:edge
+            ${{ env.DOCKERHUB_USERNAME }}/revaulter:edge
+            ${{ env.DOCKERHUB_USERNAME }}/revaulter:edge
           push: true
 
       - name: Docker build and push to GHCR - release
@@ -341,8 +341,8 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           tags: |
-            ghcr.io/${{ env.REPO_OWNER }}/unlocker:${{env.BUILD_VERSION}}
-            ghcr.io/${{ env.REPO_OWNER }}/unlocker:${{env.BRANCH}}
+            ghcr.io/${{ env.REPO_OWNER }}/revaulter:${{env.BUILD_VERSION}}
+            ghcr.io/${{ env.REPO_OWNER }}/revaulter:${{env.BRANCH}}
           push: true
 
       - name: Docker build and push to Docker Hub - release
@@ -353,6 +353,6 @@ jobs:
           file: ./Dockerfile
           platforms: linux/amd64,linux/arm64,linux/arm/v7
           tags: |
-            ${{ env.DOCKERHUB_USERNAME }}/unlocker:${{env.BUILD_VERSION}}
-            ${{ env.DOCKERHUB_USERNAME }}/unlocker:${{env.BRANCH}}
+            ${{ env.DOCKERHUB_USERNAME }}/revaulter:${{env.BUILD_VERSION}}
+            ${{ env.DOCKERHUB_USERNAME }}/revaulter:${{env.BRANCH}}
           push: true

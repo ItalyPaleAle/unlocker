@@ -1,4 +1,4 @@
-module github.com/italypaleale/unlocker
+module github.com/italypaleale/revaulter
 
 go 1.20
 

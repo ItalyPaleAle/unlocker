@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/italypaleale/unlocker/pkg/buildinfo"
+	"github.com/italypaleale/revaulter/pkg/buildinfo"
 )
 
 var routeHealthzResponse []byte

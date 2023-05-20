@@ -3,26 +3,23 @@
 azureClientId: ""
 azureTenantId: ""
 
-# Format for the webhook request
-# Supported values: "plain" (default), "slack", "discord"
-webhookFormat: "plain"
-
 # URL of the webhook to send notifications to
 # Will send the notification in the POST body as text/plain
 # (Required)
 webhookUrl: ""
 
+# Format for the webhook request
+# Supported values: "plain" (default), "slack", "discord"
+webhookFormat: "plain"
+
 # Optional key to authenticate with the webhook URL
 # If present, will be passed as value for the "Authorization" header in requests to the webhook
 webhookKey: ""
 
-# Configuration for TLS certificates and keys. It can be one of two options:
-# 1. Use "tlsPath" to set a path to a folder on disk where the TLS certificate ("tls-cert.pem") and key ("tls-key.pem") exist.
-# 2. Alternatively, use both "tlsCertPEM" and "tlsKeyPEM", which are the PEM-encoded certificate and key respectively.
-# If neither "tlsPath" and the "tlsCertPEM"/"tlsKeyPEM" pair are provided, Unlocker uses the folder where this config file is located to look for the certificate and key in files named "tls-cert.pem" and "tls-key.pem" respectively.
-tlsPath: ""
-tlsCertPEM: ""
-tlsKeyPEM: ""
+# Base URL where the application is deployed, used for authentication callbacks and in notifications
+# This URL must be routable by clients (administrators), but doesn't need to be public
+# Default: "https://localhost:8080"
+baseUrl: "https://localhost:8080"
 
 # Port to listen on
 # Default: 8080
@@ -31,6 +28,14 @@ port: 8080
 # Address to listen on
 # Default: "0.0.0.0" to listen on every interface
 bind: "0.0.0.0"
+
+# Configuration for TLS certificates and keys. It can be one of two options:
+# 1. Use "tlsPath" to set a path to a folder on disk where the TLS certificate ("tls-cert.pem") and key ("tls-key.pem") exist.
+# 2. Alternatively, use both "tlsCertPEM" and "tlsKeyPEM", which are the PEM-encoded certificate and key respectively.
+# If neither "tlsPath" and the "tlsCertPEM"/"tlsKeyPEM" pair are provided, Revaulter uses the folder where this config file is located to look for the certificate and key in files named "tls-cert.pem" and "tls-key.pem" respectively.
+tlsPath: ""
+tlsCertPEM: ""
+tlsKeyPEM: ""
 
 # Comma-separated list of IPs (and IP ranges in CIDR notation) that are allowed to invoke the /wrap, /unwrap and /result methods
 # If empty, all requests are allowed
@@ -42,11 +47,6 @@ allowedIps: ""
 # If empty or unset, will the same as baseUrl
 # To allow any origin, set value to "*"
 origins: ""
-
-# Base URL where the application is deployed, used for authentication callbacks and in notifications
-# This URL must be routable by clients (administrators), but doesn't need to be public
-# Default: "https://localhost:8080"
-baseUrl: "https://localhost:8080"
 
 # Timeout for sessions before having to authenticate again. This cannot be more than 1 hour.
 # Default: "5m"

@@ -18,7 +18,7 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/spf13/viper"
 
-	"github.com/italypaleale/unlocker/pkg/config"
+	"github.com/italypaleale/revaulter/pkg/config"
 )
 
 func loadConfig() error {
@@ -28,17 +28,17 @@ func loadConfig() error {
 	}
 
 	// Env
-	viper.SetEnvPrefix("UNLOCKER")
+	viper.SetEnvPrefix("REVAULTER")
 	viper.AutomaticEnv()
 
 	// Config file
 	viper.SetConfigName("config")
 	viper.AddConfigPath(".")
-	viper.AddConfigPath("$HOME/.unlocker")
-	viper.AddConfigPath("/etc/unlocker")
+	viper.AddConfigPath("$HOME/.revaulter")
+	viper.AddConfigPath("/etc/revaulter")
 
 	// Check if we have a specific config file to load
-	confFile := os.Getenv("UNLOCKER_CONFIG")
+	confFile := os.Getenv("REVAULTER_CONFIG")
 	if confFile != "" {
 		viper.SetConfigFile(confFile)
 	}
@@ -172,7 +172,7 @@ func setCookieKeys() error {
 	cekStr := viper.GetString(config.KeyCookieEncryptionKey)
 	if cekStr != "" {
 		h := hmac.New(crypto.SHA384.New, []byte(cekStr))
-		h.Write([]byte("unlocker-cookie-keys"))
+		h.Write([]byte("revaulter-cookie-keys"))
 		sum := h.Sum(nil)
 		cekRaw = sum[0:16]
 		cskRaw = sum[16:]
