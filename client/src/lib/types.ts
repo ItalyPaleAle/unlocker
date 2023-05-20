@@ -15,10 +15,19 @@ export enum pendingRequestStatus {
     pendingRequestFailed_Client = '_client_failed',
 }
 
+export enum operations {
+    operationEncrypt = 'encrypt',
+    operationDecrypt = 'decrypt',
+    operationSign = 'sign',
+    operationVerify = 'verify',
+    operationWrap = 'wrap',
+    operationUnwrap = 'unwrap',
+}
+
 export interface pendingRequestItem {
     state: string
     status: pendingRequestStatus
-    operation: string
+    operation: operations
     keyId: string
     vaultName: string
     requestor: string

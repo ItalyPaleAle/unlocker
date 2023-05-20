@@ -12,6 +12,7 @@
         {#if Object.keys(list).length > 1}
             <div class="flex flex-row w-full mx-auto md:w-2/3">
                 <div role="button"
+                    tabindex="0"
                     class="flex flex-row items-center flex-auto p-2 m-2 rounded shadow-sm text-emerald-700 dark:text-emerald-400 hover:text-slate-900 hover:dark:text-white bg-slate-200 dark:bg-slate-700 border-emerald-300 dark:border-emerald-600 hover:bg-emerald-300 hover:dark:bg-emerald-600"
                     on:click={() => SubmitAll(true)} on:keypress={() => SubmitAll(true)}
                 >
@@ -21,6 +22,7 @@
                     <span>Confirm All</span>
                 </div>
                 <div role="button"
+                    tabindex="0"
                     class="flex flex-row items-center flex-auto p-2 m-2 rounded shadow-sm text-rose-700 dark:text-rose-400 hover:text-slate-900 hover:dark:text-white bg-slate-200 dark:bg-slate-700 border-rose-300 dark:border-rose-600 hover:bg-rose-300 hover:dark:bg-rose-600"
                     on:click={() => SubmitAll(false)} on:keypress={() => SubmitAll(false)}
                 >

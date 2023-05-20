@@ -27,7 +27,7 @@ module.exports = {
     entry: path.resolve(__dirname, 'src/main.ts'),
     resolve: {
         mainFields: ['svelte', 'browser', 'style', 'module', 'main'],
-        extensions: ['.ts', '.mjs', '.js', '.svelte']
+        extensions: ['.ts', '.mjs', '.js', '.svelte'],
     },
     output: {
         path: path.resolve(__dirname, 'dist/'),

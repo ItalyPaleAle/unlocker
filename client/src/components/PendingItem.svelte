@@ -4,18 +4,14 @@
     {/if}
     <div class="flex flex-row">
         <div class="flex-none pt-2 mr-4 w-14 h-14 text-slate-700 dark:text-slate-300">
-            {#if item.operation == 'wrap'}
-                <Icon icon="lock-closed" title="Wrap request" size="14" />
-            {:else if item.operation == 'unwrap'}
-                <Icon icon="lock-open" title="Unwrap request" size="14" />
-            {/if}
+            <Icon icon={itemUI.icon} title={itemUI.iconTitle} size="14" />
         </div>
         <div class="space-y-2">
             <div class="space-y-0.5">
                 <span class="flex flex-row items-center">
                     <span class="flex-none w-6 pr-2"></span>
                     <span class="flex-grow">
-                        <b class="text-slate-900 dark:text-white">{item.requestor}</b> wants to <b class="text-slate-900 dark:text-white">{item.operation}</b> a key
+                        <b class="text-slate-900 dark:text-white">{item.requestor}</b> wants to <b class="text-slate-900 dark:text-white">{itemUI.action}</b> {itemUI.actionObject}
                     </span>
                 </span>
                 {#if item.note}
@@ -97,12 +93,60 @@
 import {format} from 'date-fns'
 
 import {Request} from '../lib/request'
-import {pendingRequestStatus, type pendingRequestItem} from '../lib/types'
+import {pendingRequestStatus, type pendingRequestItem, operations} from '../lib/types'
 
 import Icon from './Icon.svelte'
 import LoadingSpinner from './LoadingSpinner.svelte'
 
 export let item: pendingRequestItem
+$: itemUI = uiForOperation(item.operation)
+
+function uiForOperation(operation: operations) {
+    switch (operation) {
+        case operations.operationEncrypt:
+            return {
+                action: 'encrypt',
+                actionObject: 'a message',
+                icon: 'lock-closed',
+                iconTitle: 'Encrypt request'
+            }
+        case operations.operationDecrypt:
+            return {
+                action: 'decrypt',
+                actionObject: 'a message',
+                icon: 'lock-open',
+                iconTitle: 'Decrypt request'
+            }
+        case operations.operationSign:
+            return {
+                action: 'sign',
+                actionObject: 'a message',
+                icon: 'pencil',
+                iconTitle: 'Sign request'
+            }
+        case operations.operationVerify:
+            return {
+                action: 'verify',
+                actionObject: 'a signature',
+                icon: 'check-badge',
+                iconTitle: 'Verify request'
+            }
+        case operations.operationWrap:
+            return {
+                action: 'wrap',
+                actionObject: 'a key',
+                icon: 'lock-closed',
+                iconTitle: 'Wrap request'
+            }
+        case operations.operationUnwrap:
+            return {
+                action: 'unwrap',
+                actionObject: 'a key',
+                icon: 'lock-open',
+                iconTitle: 'Unwrap request'
+            }
+    }
+}
 
 let submitting: Promise<void> = Promise.resolve()
 let error: string|null = null
