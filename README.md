@@ -1,3 +1,11 @@
+# ⚠️⚠️ Unlocker is now [Revaulter](https://github.com/ItalyPaleAle/revaulter/) ⚠️⚠️
+
+**This repository is archived.**
+
+Check out [Revaulter](https://github.com/ItalyPaleAle/revaulter/), the next generation of Unlocker with lots of new features.
+
+---
+
 # Unlocker v0.5
 
 Unlocker lets you wrap and unwrap (encrypt and decrypt) cryptographic keys for use by applications, securely after getting consent from an admin.
